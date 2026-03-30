@@ -1,18 +1,37 @@
 'use client';
 
+import { useState } from 'react';
+
 import { Button } from '@/components/ui/Button';
-import { downloadCSRReport } from '@/lib/pdf/csrReport';
-import type { CSRReportData } from '@/types';
+import { generateCSRReport } from '@/lib/pdf/csrReport';
+import type { DashboardStats, SessionRecord, Student } from '@/types';
 
 interface CSRReportButtonProps {
-  data: CSRReportData;
+  stats: DashboardStats;
+  students: Student[];
+  sessions: SessionRecord[];
 }
 
-export function CSRReportButton({ data }: CSRReportButtonProps) {
+export function CSRReportButton({ stats, students, sessions }: CSRReportButtonProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  async function handleGenerate(): Promise<void> {
+    try {
+      setIsGenerating(true);
+      generateCSRReport(stats, students, sessions);
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
   return (
-    <Button variant="secondary" onClick={() => downloadCSRReport(data)}>
-      Export CSR PDF
+    <Button
+      type="button"
+      variant="secondary"
+      isLoading={isGenerating}
+      onClick={() => void handleGenerate()}
+    >
+      Generate CSR Report
     </Button>
   );
 }
-

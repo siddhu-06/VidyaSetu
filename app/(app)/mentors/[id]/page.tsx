@@ -7,6 +7,7 @@ import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useMentor } from '@/hooks/useMentors';
 import { useRealtimeDashboard } from '@/hooks/useRealtimeDashboard';
+import type { Mentor } from '@/types';
 
 export default function MentorProfilePage() {
   const params = useParams<{ id: string }>();
@@ -26,9 +27,16 @@ export default function MentorProfilePage() {
     );
   }
 
-  const leaderboardEntry = dashboardQuery.data?.leaderboard.find(
-    (entry) => entry.mentorId === mentorQuery.data?.id,
-  );
+  const mentor = mentorQuery.data;
+
+  const leaderboard = [...dashboardQuery.mentors]
+    .sort((left: Mentor, right: Mentor) => right.session_count - left.session_count)
+    .map((mentor, index) => ({
+      mentorId: mentor.id,
+      rank: index + 1,
+    }));
+
+  const leaderboardEntry = leaderboard.find((entry) => entry.mentorId === mentor.id);
 
   return (
     <div className="grid gap-6">
@@ -86,4 +94,3 @@ export default function MentorProfilePage() {
     </div>
   );
 }
-
