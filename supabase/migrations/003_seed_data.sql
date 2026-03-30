@@ -1,416 +1,208 @@
-insert into public.mentors (
-  id,
-  full_name,
-  email,
-  phone,
-  languages,
-  focus_grades,
-  localities,
-  weekly_capacity,
-  sessions_completed,
-  consistency_score,
-  empathy_score,
-  teaching_score
-)
-values
-  ('00000000-0000-0000-0000-000000000101', 'Ananya Rao', 'ananya@youngistaan.org', '919900000101', array['en', 'te'], array['3', '4', '5'], array['Nalgonda', 'Saroornagar'], 6, 52, 92, 90, 88),
-  ('00000000-0000-0000-0000-000000000102', 'Rahul Verma', 'rahul@youngistaan.org', '919900000102', array['en', 'hi'], array['2', '3', '4'], array['Wanaparthy', 'Attapur'], 5, 49, 88, 84, 86),
-  ('00000000-0000-0000-0000-000000000103', 'Sravani M', 'sravani@youngistaan.org', '919900000103', array['en', 'te'], array['1', '2', '3'], array['Borabanda', 'Nalgonda'], 7, 57, 95, 93, 89),
-  ('00000000-0000-0000-0000-000000000104', 'Imran Khan', 'imran@youngistaan.org', '919900000104', array['en', 'hi'], array['4', '5', '6'], array['GHMC Slum Cluster', 'Saroornagar'], 4, 41, 82, 85, 83),
-  ('00000000-0000-0000-0000-000000000105', 'Lakshmi Priya', 'lakshmi@youngistaan.org', '919900000105', array['en', 'te', 'hi'], array['Balwadi', 'KG', '1', '2'], array['Wanaparthy', 'GHMC Slum Cluster'], 6, 54, 91, 94, 87)
-on conflict (id) do update
-set
-  full_name = excluded.full_name,
-  email = excluded.email,
-  phone = excluded.phone,
-  languages = excluded.languages,
-  focus_grades = excluded.focus_grades,
-  localities = excluded.localities,
-  weekly_capacity = excluded.weekly_capacity,
-  sessions_completed = excluded.sessions_completed,
-  consistency_score = excluded.consistency_score,
-  empathy_score = excluded.empathy_score,
-  teaching_score = excluded.teaching_score;
+-- ═══════════════════════════════════════════════════
+-- VIDYASETU DEMO SEED DATA — FIXED
+-- Fixed UUIDs for reproducibility.
+-- Run AFTER migrations 001 and 002 are applied.
+-- Mentors inserted with user_id = NULL (seed-safe).
+-- Run scripts/seed.ts to attach real auth users for login.
+-- ═══════════════════════════════════════════════════
 
-insert into public.students (
-  id,
-  full_name,
-  preferred_name,
-  age,
-  grade,
-  school_name,
-  locality,
-  migration_status,
-  baseline_reading_level,
-  baseline_arithmetic_level,
-  attendance_rate,
-  guardian_name,
-  guardian_phone,
-  preferred_language,
-  sms_opt_in,
-  active
-)
-values
-  ('00000000-0000-0000-0000-000000000201', 'Aarav Naik', 'Aaru', 9, '4', 'Govt Primary School Nalgonda', 'Nalgonda', 'stable', 2, 2, 83, 'Sunita Naik', '919800000201', 'te', true, true),
-  ('00000000-0000-0000-0000-000000000202', 'Meena Kumari', null, 8, '3', 'Mandal Parishad School', 'Wanaparthy', 'seasonal', 3, 2, 78, 'Raju Kumari', '919800000202', 'hi', true, true),
-  ('00000000-0000-0000-0000-000000000203', 'Ritesh Yadav', null, 10, '5', 'Govt School Attapur', 'Attapur', 'stable', 2, 3, 88, 'Sarita Yadav', '919800000203', 'hi', true, true),
-  ('00000000-0000-0000-0000-000000000204', 'Navya B', 'Navu', 7, '2', 'Community Learning Centre', 'Borabanda', 'recently_migrated', 2, 1, 69, 'Bhavani', '919800000204', 'te', true, true),
-  ('00000000-0000-0000-0000-000000000205', 'Faizan Ali', null, 11, '5', 'Govt High School', 'GHMC Slum Cluster', 'seasonal', 3, 2, 74, 'Shabana Ali', '919800000205', 'en', true, true),
-  ('00000000-0000-0000-0000-000000000206', 'Keerthana G', null, 6, '1', 'Bridge Centre Wanaparthy', 'Wanaparthy', 'stable', 1, 1, 92, 'Gopal G', '919800000206', 'te', true, true),
-  ('00000000-0000-0000-0000-000000000207', 'Sohan Lal', null, 9, '4', 'Municipal School', 'Saroornagar', 'stable', 2, 3, 86, 'Kamla Lal', '919800000207', 'hi', true, true),
-  ('00000000-0000-0000-0000-000000000208', 'Pavani Reddy', null, 8, '3', 'Community Learning Centre', 'Nalgonda', 'seasonal', 3, 3, 80, 'Madhavi Reddy', '919800000208', 'te', true, true),
-  ('00000000-0000-0000-0000-000000000209', 'Jeevan Kumar', null, 12, '6', 'Govt School Attapur', 'Attapur', 'stable', 3, 2, 77, 'Latha Kumar', '919800000209', 'en', true, true),
-  ('00000000-0000-0000-0000-000000000210', 'Aisha Fatima', null, 7, '2', 'Basti Learning Hub', 'GHMC Slum Cluster', 'recently_migrated', 2, 1, 66, 'Nusrat Fatima', '919800000210', 'hi', true, true),
-  ('00000000-0000-0000-0000-000000000211', 'Charan Teja', null, 10, '5', 'Govt Primary School Nalgonda', 'Nalgonda', 'stable', 2, 2, 90, 'Mahesh Teja', '919800000211', 'te', true, true),
-  ('00000000-0000-0000-0000-000000000212', 'Jyothi Rani', null, 6, '1', 'Bridge Centre Wanaparthy', 'Wanaparthy', 'seasonal', 1, 2, 72, 'Rani Devi', '919800000212', 'hi', true, true)
-on conflict (id) do update
-set
-  full_name = excluded.full_name,
-  preferred_name = excluded.preferred_name,
-  age = excluded.age,
-  grade = excluded.grade,
-  school_name = excluded.school_name,
-  locality = excluded.locality,
-  migration_status = excluded.migration_status,
-  baseline_reading_level = excluded.baseline_reading_level,
-  baseline_arithmetic_level = excluded.baseline_arithmetic_level,
-  attendance_rate = excluded.attendance_rate,
-  guardian_name = excluded.guardian_name,
-  guardian_phone = excluded.guardian_phone,
-  preferred_language = excluded.preferred_language,
-  sms_opt_in = excluded.sms_opt_in,
-  active = excluded.active;
+-- Step 0: Temporarily allow NULL user_id for seed
+-- (only in local dev / hackathon demo environment)
+ALTER TABLE mentors ALTER COLUMN user_id DROP NOT NULL;
 
-insert into public.session_templates (
-  id,
-  title,
-  focus_skills,
-  note_hint,
-  duration_minutes
-)
-values
-  ('00000000-0000-0000-0000-000000000301', 'Reading recovery', array['reading', 'comprehension', 'confidence'], 'Student struggled with fluency and inference but responded well to paired reading.', 60),
-  ('00000000-0000-0000-0000-000000000302', 'Arithmetic catch-up', array['arithmetic', 'confidence'], 'Student needed support with regrouping, subtraction or multiplication strategy.', 60),
-  ('00000000-0000-0000-0000-000000000303', 'Bridge writing practice', array['writing', 'reading', 'confidence'], 'Student attempted sentence writing, dictation, and oral vocabulary transfer.', 45)
-on conflict (id) do update
-set
-  title = excluded.title,
-  focus_skills = excluded.focus_skills,
-  note_hint = excluded.note_hint,
-  duration_minutes = excluded.duration_minutes;
+-- NGO
+INSERT INTO ngos (id, name, contact_email, twilio_from_number)
+VALUES (
+  '11111111-1111-1111-1111-111111111111',
+  'Youngistaan Foundation',
+  'info@youngistaan.org',
+  '+14155551234'
+) ON CONFLICT (id) DO NOTHING;
 
-insert into public.passport_shares (
-  student_id,
-  public_code,
-  active
-)
-values
-  ('00000000-0000-0000-0000-000000000201', 'VS-AARAV-201', true),
-  ('00000000-0000-0000-0000-000000000202', 'VS-MEENA-202', true),
-  ('00000000-0000-0000-0000-000000000203', 'VS-RITESH-203', true),
-  ('00000000-0000-0000-0000-000000000204', 'VS-NAVYA-204', true),
-  ('00000000-0000-0000-0000-000000000205', 'VS-FAIZAN-205', true),
-  ('00000000-0000-0000-0000-000000000206', 'VS-KEERTHANA-206', true),
-  ('00000000-0000-0000-0000-000000000207', 'VS-SOHAN-207', true),
-  ('00000000-0000-0000-0000-000000000208', 'VS-PAVANI-208', true),
-  ('00000000-0000-0000-0000-000000000209', 'VS-JEEVAN-209', true),
-  ('00000000-0000-0000-0000-000000000210', 'VS-AISHA-210', true),
-  ('00000000-0000-0000-0000-000000000211', 'VS-CHARAN-211', true),
-  ('00000000-0000-0000-0000-000000000212', 'VS-JYOTHI-212', true)
-on conflict (student_id) do update
-set
-  public_code = excluded.public_code,
-  active = excluded.active;
+-- Centers
+INSERT INTO centers (id, name, city, ngo_id) VALUES
+  ('22222222-2222-2222-2222-222222222222', 'Nalgonda Center',   'Nalgonda',  '11111111-1111-1111-1111-111111111111'),
+  ('33333333-3333-3333-3333-333333333333', 'Wanaparthy Center', 'Wanaparthy', '11111111-1111-1111-1111-111111111111'),
+  ('44444444-4444-4444-4444-444444444444', 'GHMC Slum Cluster', 'Hyderabad',  '11111111-1111-1111-1111-111111111111')
+ON CONFLICT (id) DO NOTHING;
 
-delete from public.mentor_matches
-where student_id in (
-  '00000000-0000-0000-0000-000000000201',
-  '00000000-0000-0000-0000-000000000202',
-  '00000000-0000-0000-0000-000000000203',
-  '00000000-0000-0000-0000-000000000204',
-  '00000000-0000-0000-0000-000000000205',
-  '00000000-0000-0000-0000-000000000206',
-  '00000000-0000-0000-0000-000000000207',
-  '00000000-0000-0000-0000-000000000208',
-  '00000000-0000-0000-0000-000000000209',
-  '00000000-0000-0000-0000-000000000210',
-  '00000000-0000-0000-0000-000000000211',
-  '00000000-0000-0000-0000-000000000212'
-);
-
-delete from public.risk_snapshots
-where student_id in (
-  '00000000-0000-0000-0000-000000000201',
-  '00000000-0000-0000-0000-000000000202',
-  '00000000-0000-0000-0000-000000000203',
-  '00000000-0000-0000-0000-000000000204',
-  '00000000-0000-0000-0000-000000000205',
-  '00000000-0000-0000-0000-000000000206',
-  '00000000-0000-0000-0000-000000000207',
-  '00000000-0000-0000-0000-000000000208',
-  '00000000-0000-0000-0000-000000000209',
-  '00000000-0000-0000-0000-000000000210',
-  '00000000-0000-0000-0000-000000000211',
-  '00000000-0000-0000-0000-000000000212'
-);
-
-delete from public.parent_messages
-where student_id in (
-  '00000000-0000-0000-0000-000000000201',
-  '00000000-0000-0000-0000-000000000202',
-  '00000000-0000-0000-0000-000000000203',
-  '00000000-0000-0000-0000-000000000204',
-  '00000000-0000-0000-0000-000000000205',
-  '00000000-0000-0000-0000-000000000206',
-  '00000000-0000-0000-0000-000000000207',
-  '00000000-0000-0000-0000-000000000208',
-  '00000000-0000-0000-0000-000000000209',
-  '00000000-0000-0000-0000-000000000210',
-  '00000000-0000-0000-0000-000000000211',
-  '00000000-0000-0000-0000-000000000212'
-);
-
-delete from public.sessions
-where offline_id like 'seed-%';
-
-with student_seed as (
-  select
-    id,
-    row_number() over (order by id) as student_index,
-    full_name,
-    locality,
-    baseline_reading_level,
-    baseline_arithmetic_level
-  from public.students
-  where id between '00000000-0000-0000-0000-000000000201' and '00000000-0000-0000-0000-000000000212'
-),
-mentor_seed as (
-  select
-    id,
-    row_number() over (order by id) as mentor_index
-  from public.mentors
-  where id between '00000000-0000-0000-0000-000000000101' and '00000000-0000-0000-0000-000000000105'
-),
-template_seed as (
-  select
-    id,
-    row_number() over (order by id) as template_index
-  from public.session_templates
-  where id between '00000000-0000-0000-0000-000000000301' and '00000000-0000-0000-0000-000000000303'
-),
-weeks as (
-  select generate_series(0, 7) as week_index
-)
-insert into public.sessions (
-  offline_id,
-  student_id,
-  mentor_id,
-  template_id,
-  session_date,
-  started_at,
-  duration_minutes,
-  mode,
-  attendance,
-  engagement_level,
-  confidence_delta,
-  notes,
-  learning_gaps,
-  skill_ratings,
-  sync_source,
-  created_at,
-  updated_at
-)
-select
-  format('seed-%s-%s', right(student_seed.id::text, 4), weeks.week_index),
-  student_seed.id,
+-- Mentors (user_id NULL — safe for seed, attach later via scripts/seed.ts)
+INSERT INTO mentors (
+  id, user_id, name, phone, subjects, availability,
+  center_id, gender, session_count, avg_student_improvement,
+  active_student_count, active
+) VALUES
   (
-    select mentor_seed.id
-    from mentor_seed
-    where mentor_seed.mentor_index = ((student_seed.student_index + weeks.week_index - 1) % 5) + 1
+    'aaaa0001-0000-0000-0000-000000000001', NULL,
+    'Ravi Kumar', '+919876541001',
+    ARRAY['math','science'],
+    '{"mon":["09:00","17:00"],"wed":["09:00","17:00"]}',
+    '22222222-2222-2222-2222-222222222222',
+    'M', 48, 0.80, 6, true
   ),
   (
-    select template_seed.id
-    from template_seed
-    where template_seed.template_index = (weeks.week_index % 3) + 1
+    'aaaa0002-0000-0000-0000-000000000002', NULL,
+    'Anita Reddy', '+919876541002',
+    ARRAY['reading','english','comprehension'],
+    '{"tue":["10:00","16:00"],"thu":["10:00","16:00"]}',
+    '22222222-2222-2222-2222-222222222222',
+    'F', 36, 0.75, 5, true
   ),
-  (current_date - ((7 - weeks.week_index) * interval '7 days'))::date,
-  timezone('utc', now()) - ((7 - weeks.week_index) * interval '7 days') + interval '10 hours',
-  case when weeks.week_index % 3 = 0 then 45 else 60 end,
-  case
-    when weeks.week_index % 4 = 0 then 'home-visit'
-    when weeks.week_index % 3 = 0 then 'phone'
-    else 'offline'
-  end,
-  case
-    when (student_seed.student_index + weeks.week_index) % 11 = 0 then 'absent'
-    when (student_seed.student_index + weeks.week_index) % 7 = 0 then 'late'
-    else 'present'
-  end,
-  greatest(1, least(5, 2 + ((student_seed.student_index + weeks.week_index) % 3))),
-  case
-    when weeks.week_index <= 2 and student_seed.student_index in (2, 4, 10, 12) then -1
-    when weeks.week_index >= 5 then 1
-    else 0
-  end,
-  case
-    when (student_seed.student_index + weeks.week_index) % 5 = 0 then
-      student_seed.full_name || ' struggled with subtraction borrowing and needed repeated modelling.'
-    when (student_seed.student_index + weeks.week_index) % 4 = 0 then
-      student_seed.full_name || ' improved reading fluency after paired practice but still hesitated on multisyllabic words.'
-    when (student_seed.student_index + weeks.week_index) % 3 = 0 then
-      student_seed.full_name || ' attempted sentence writing, but grammar and spacing need another round.'
-    else
-      student_seed.full_name || ' stayed engaged, completed the worksheet, and responded well to oral prompts.'
-  end,
-  array_remove(
-    array[
-      case when student_seed.student_index in (1, 4, 5, 10) and weeks.week_index <= 3 then 'arithmetic: subtraction' end,
-      case when student_seed.student_index in (2, 8, 11) and weeks.week_index between 1 and 5 then 'reading: fluency' end,
-      case when student_seed.student_index in (4, 10, 12) and weeks.week_index <= 2 then 'writing: sentence construction' end
-    ],
-    null
+  (
+    'aaaa0003-0000-0000-0000-000000000003', NULL,
+    'Kumar Sai', '+919876541003',
+    ARRAY['math','english'],
+    '{"mon":["14:00","18:00"]}',
+    '33333333-3333-3333-3333-333333333333',
+    'M', 22, 0.60, 4, true
   ),
-  jsonb_build_object(
-    'reading',
-    greatest(1, least(5, student_seed.baseline_reading_level + floor(weeks.week_index / 3)::int)),
-    'comprehension',
-    greatest(1, least(5, student_seed.baseline_reading_level + floor((weeks.week_index + 1) / 4)::int)),
-    'writing',
-    greatest(1, least(5, student_seed.baseline_reading_level + floor(weeks.week_index / 4)::int)),
-    'arithmetic',
-    greatest(1, least(5, student_seed.baseline_arithmetic_level + floor(weeks.week_index / 3)::int)),
-    'confidence',
-    greatest(1, least(5, 2 + floor(weeks.week_index / 3)::int))
+  (
+    'aaaa0004-0000-0000-0000-000000000004', NULL,
+    'Fatima Begum', '+919876541004',
+    ARRAY['reading','comprehension'],
+    '{"wed":["09:00","13:00"],"fri":["09:00","13:00"]}',
+    '33333333-3333-3333-3333-333333333333',
+    'F', 31, 0.70, 4, true
   ),
-  'server',
-  timezone('utc', now()) - ((7 - weeks.week_index) * interval '7 days'),
-  timezone('utc', now()) - ((7 - weeks.week_index) * interval '7 days')
-from student_seed
-cross join weeks;
+  (
+    'aaaa0005-0000-0000-0000-000000000005', NULL,
+    'Suresh Babu', '+919876541005',
+    ARRAY['science','math'],
+    '{"sat":["09:00","12:00"]}',
+    '44444444-4444-4444-4444-444444444444',
+    'M', 18, 0.55, 3, true
+  )
+ON CONFLICT (id) DO NOTHING;
 
-update public.students
-set
-  attendance_rate = session_stats.attendance_rate,
-  last_session_at = session_stats.last_session_at
-from (
-  select
-    student_id,
-    round(
-      100.0 * count(*) filter (where attendance = 'present') / greatest(count(*), 1),
-      2
-    ) as attendance_rate,
-    max(started_at) as last_session_at
-  from public.sessions
-  where offline_id like 'seed-%'
-  group by student_id
-) as session_stats
-where public.students.id = session_stats.student_id;
+-- Students
+-- 4 RED: high gap_profile, last_session > 14 days ago
+INSERT INTO students (id, name, grade, gender, center_id, assigned_mentor_id,
+  gap_profile, risk_score, risk_color, last_session_at, engagement_score, preferred_time_slot, parent_language) VALUES
+('bbbb0001-0000-0000-0000-000000000001', 'Priya Sharma',   5, 'F', '22222222-2222-2222-2222-222222222222',
+  'aaaa0001-0000-0000-0000-000000000001',
+  '{"math":2.3,"reading":2.0,"science":1.8,"english":2.5,"comprehension":2.1}',
+  0.72, 'red', NOW() - INTERVAL '16 days', 0.6, '09:00', 'hi'),
+('bbbb0002-0000-0000-0000-000000000002', 'Rahul Verma',    4, 'M', '22222222-2222-2222-2222-222222222222',
+  'aaaa0001-0000-0000-0000-000000000001',
+  '{"math":4.5,"reading":3.8,"science":4.0,"english":3.5,"comprehension":3.9}',
+  0.85, 'red', NOW() - INTERVAL '22 days', 0.3, '09:00', 'te'),
+('bbbb0003-0000-0000-0000-000000000003', 'Sita Devi',      3, 'F', '33333333-3333-3333-3333-333333333333',
+  'aaaa0003-0000-0000-0000-000000000003',
+  '{"math":3.8,"reading":4.2,"science":3.5,"english":4.0,"comprehension":4.1}',
+  0.80, 'red', NOW() - INTERVAL '18 days', 0.4, '14:00', 'hi'),
+('bbbb0004-0000-0000-0000-000000000004', 'Arjun Nair',     6, 'M', '44444444-4444-4444-4444-444444444444',
+  'aaaa0005-0000-0000-0000-000000000005',
+  '{"math":4.0,"reading":3.5,"science":3.8,"english":3.2,"comprehension":3.7}',
+  0.78, 'red', NOW() - INTERVAL '20 days', 0.35, '09:00', 'en')
+ON CONFLICT (id) DO NOTHING;
 
-insert into public.risk_snapshots (
-  student_id,
-  risk_score,
-  risk_level,
-  reason_codes,
-  calculated_at
-)
-select
-  students.id,
-  case
-    when students.id in ('00000000-0000-0000-0000-000000000204', '00000000-0000-0000-0000-000000000210') then 84
-    when students.id in ('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-000000000205', '00000000-0000-0000-0000-000000000212') then 66
-    when students.id in ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000208', '00000000-0000-0000-0000-000000000209') then 42
-    else 24
-  end,
-  case
-    when students.id in ('00000000-0000-0000-0000-000000000204', '00000000-0000-0000-0000-000000000210') then 'critical'
-    when students.id in ('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-000000000205', '00000000-0000-0000-0000-000000000212') then 'high'
-    when students.id in ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000208', '00000000-0000-0000-0000-000000000209') then 'moderate'
-    else 'low'
-  end,
-  case
-    when students.id in ('00000000-0000-0000-0000-000000000204', '00000000-0000-0000-0000-000000000210') then array['migration_risk', 'learning_gaps', 'attendance_drop']
-    when students.id in ('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-000000000205', '00000000-0000-0000-0000-000000000212') then array['attendance_drop', 'session_gap']
-    when students.id in ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000208', '00000000-0000-0000-0000-000000000209') then array['learning_gaps']
-    else array['stable']
-  end,
-  timezone('utc', now())
-from public.students
-where students.id between '00000000-0000-0000-0000-000000000201' and '00000000-0000-0000-0000-000000000212';
+-- 4 AMBER: moderate gaps, session 7–14 days ago
+INSERT INTO students (id, name, grade, gender, center_id, assigned_mentor_id,
+  gap_profile, risk_score, risk_color, last_session_at, engagement_score, preferred_time_slot, parent_language) VALUES
+('bbbb0005-0000-0000-0000-000000000005', 'Meera Singh',    5, 'F', '22222222-2222-2222-2222-222222222222',
+  'aaaa0002-0000-0000-0000-000000000002',
+  '{"math":2.8,"reading":2.5,"science":2.2,"english":3.0,"comprehension":2.7}',
+  0.55, 'amber', NOW() - INTERVAL '10 days', 0.55, '10:00', 'hi'),
+('bbbb0006-0000-0000-0000-000000000006', 'Vikram Rao',     4, 'M', '22222222-2222-2222-2222-222222222222',
+  'aaaa0001-0000-0000-0000-000000000001',
+  '{"math":3.1,"reading":2.0,"science":3.3,"english":2.5,"comprehension":2.8}',
+  0.58, 'amber', NOW() - INTERVAL '12 days', 0.5, '09:00', 'te'),
+('bbbb0007-0000-0000-0000-000000000007', 'Kavitha Reddy',  6, 'F', '33333333-3333-3333-3333-333333333333',
+  'aaaa0004-0000-0000-0000-000000000004',
+  '{"math":2.5,"reading":3.0,"science":2.0,"english":2.8,"comprehension":3.2}',
+  0.52, 'amber', NOW() - INTERVAL '9 days', 0.6, '09:00', 'te'),
+('bbbb0008-0000-0000-0000-000000000008', 'Sunil Patil',    5, 'M', '44444444-4444-4444-4444-444444444444',
+  'aaaa0005-0000-0000-0000-000000000005',
+  '{"math":2.9,"reading":2.3,"science":3.0,"english":2.6,"comprehension":2.4}',
+  0.50, 'amber', NOW() - INTERVAL '8 days', 0.62, '09:00', 'hi')
+ON CONFLICT (id) DO NOTHING;
 
-insert into public.parent_messages (
-  student_id,
-  direction,
-  channel,
-  locale,
-  body,
-  delivery_status,
-  response_code,
-  created_at
-)
-select
-  students.id,
-  'outbound',
-  'sms',
-  students.preferred_language,
-  'VidyaSetu update: today''s session was logged and your child''s learning record is updated. Reply H or C.',
-  'delivered',
-  null,
-  timezone('utc', now()) - interval '2 days'
-from public.students
-where students.id between '00000000-0000-0000-0000-000000000201' and '00000000-0000-0000-0000-000000000212';
+-- 4 GREEN: low gaps, session within 7 days
+INSERT INTO students (id, name, grade, gender, center_id, assigned_mentor_id,
+  gap_profile, risk_score, risk_color, last_session_at, engagement_score, preferred_time_slot, parent_language) VALUES
+('bbbb0009-0000-0000-0000-000000000009', 'Lakshmi Iyer',   5, 'F', '22222222-2222-2222-2222-222222222222',
+  'aaaa0002-0000-0000-0000-000000000002',
+  '{"math":0.8,"reading":0.5,"science":0.9,"english":0.6,"comprehension":0.7}',
+  0.20, 'green', NOW() - INTERVAL '3 days', 0.85, '10:00', 'en'),
+('bbbb0010-0000-0000-0000-000000000010', 'Deepak Mehta',   4, 'M', '22222222-2222-2222-2222-222222222222',
+  'aaaa0001-0000-0000-0000-000000000001',
+  '{"math":1.2,"reading":0.8,"science":1.0,"english":0.9,"comprehension":0.7}',
+  0.25, 'green', NOW() - INTERVAL '5 days', 0.80, '09:00', 'hi'),
+('bbbb0011-0000-0000-0000-000000000011', 'Pooja Sharma',   3, 'F', '33333333-3333-3333-3333-333333333333',
+  'aaaa0004-0000-0000-0000-000000000004',
+  '{"math":0.5,"reading":1.0,"science":0.8,"english":1.1,"comprehension":0.9}',
+  0.18, 'green', NOW() - INTERVAL '2 days', 0.90, '09:00', 'hi'),
+('bbbb0012-0000-0000-0000-000000000012', 'Kiran Bhat',     6, 'M', '44444444-4444-4444-4444-444444444444',
+  'aaaa0005-0000-0000-0000-000000000005',
+  '{"math":1.5,"reading":1.2,"science":1.3,"english":1.0,"comprehension":1.1}',
+  0.28, 'green', NOW() - INTERVAL '4 days', 0.75, '09:00', 'en')
+ON CONFLICT (id) DO NOTHING;
 
-insert into public.parent_messages (
-  student_id,
-  direction,
-  channel,
-  locale,
-  body,
-  delivery_status,
-  response_code,
-  created_at
-)
-values
-  ('00000000-0000-0000-0000-000000000201', 'inbound', 'sms', 'te', 'H', 'received', 'H', timezone('utc', now()) - interval '1 day'),
-  ('00000000-0000-0000-0000-000000000202', 'inbound', 'sms', 'hi', 'C', 'received', 'C', timezone('utc', now()) - interval '1 day'),
-  ('00000000-0000-0000-0000-000000000204', 'inbound', 'sms', 'te', 'C', 'received', 'C', timezone('utc', now()) - interval '1 day'),
-  ('00000000-0000-0000-0000-000000000206', 'inbound', 'sms', 'te', 'H', 'received', 'H', timezone('utc', now()) - interval '1 day'),
-  ('00000000-0000-0000-0000-000000000210', 'inbound', 'sms', 'hi', 'C', 'received', 'C', timezone('utc', now()) - interval '1 day'),
-  ('00000000-0000-0000-0000-000000000211', 'inbound', 'sms', 'te', 'H', 'received', 'H', timezone('utc', now()) - interval '1 day');
+-- Parent contacts for all 12 students
+INSERT INTO parent_contacts (student_id, phone, language, sms_consent) VALUES
+('bbbb0001-0000-0000-0000-000000000001', '+919000000001', 'hi', true),
+('bbbb0002-0000-0000-0000-000000000002', '+919000000002', 'te', true),
+('bbbb0003-0000-0000-0000-000000000003', '+919000000003', 'hi', true),
+('bbbb0004-0000-0000-0000-000000000004', '+919000000004', 'en', true),
+('bbbb0005-0000-0000-0000-000000000005', '+919000000005', 'hi', true),
+('bbbb0006-0000-0000-0000-000000000006', '+919000000006', 'te', true),
+('bbbb0007-0000-0000-0000-000000000007', '+919000000007', 'te', true),
+('bbbb0008-0000-0000-0000-000000000008', '+919000000008', 'hi', true),
+('bbbb0009-0000-0000-0000-000000000009', '+919000000009', 'en', true),
+('bbbb0010-0000-0000-0000-000000000010', '+919000000010', 'hi', true),
+('bbbb0011-0000-0000-0000-000000000011', '+919000000011', 'hi', true),
+('bbbb0012-0000-0000-0000-000000000012', '+919000000012', 'en', true)
+ON CONFLICT (student_id) DO NOTHING;
 
-with student_seed as (
-  select
-    id,
-    row_number() over (order by id) as student_index
-  from public.students
-  where id between '00000000-0000-0000-0000-000000000201' and '00000000-0000-0000-0000-000000000212'
-),
-mentor_seed as (
-  select
-    id,
-    row_number() over (order by id) as mentor_index
-  from public.mentors
-  where id between '00000000-0000-0000-0000-000000000101' and '00000000-0000-0000-0000-000000000105'
-)
-insert into public.mentor_matches (
-  student_id,
-  mentor_id,
-  score,
-  signal_breakdown,
-  created_at
-)
-select
-  student_seed.id,
-  mentor_seed.id,
-  72 + ((student_seed.student_index + mentor_seed.mentor_index) % 22),
-  jsonb_build_object(
-    'language', 80 + ((student_seed.student_index + mentor_seed.mentor_index) % 15),
-    'location', 65 + ((student_seed.student_index + mentor_seed.mentor_index) % 20),
-    'grade', 70 + ((student_seed.student_index + mentor_seed.mentor_index) % 18),
-    'capacity', 68 + ((student_seed.student_index + mentor_seed.mentor_index) % 14),
-    'consistency', 75 + mentor_seed.mentor_index
-  ),
-  timezone('utc', now())
-from student_seed
-join mentor_seed
-  on mentor_seed.mentor_index = ((student_seed.student_index - 1) % 5) + 1;
+-- Priya's gap_history healing arc (8 weeks)
+INSERT INTO gap_history (student_id, week_start, gap_profile) VALUES
+('bbbb0001-0000-0000-0000-000000000001', CURRENT_DATE - INTERVAL '56 days',
+  '{"math":4.2,"reading":3.1,"science":2.0,"english":2.8,"comprehension":2.5}'),
+('bbbb0001-0000-0000-0000-000000000001', CURRENT_DATE - INTERVAL '49 days',
+  '{"math":4.0,"reading":3.0,"science":1.9,"english":2.7,"comprehension":2.4}'),
+('bbbb0001-0000-0000-0000-000000000001', CURRENT_DATE - INTERVAL '42 days',
+  '{"math":3.8,"reading":2.9,"science":1.9,"english":2.7,"comprehension":2.3}'),
+('bbbb0001-0000-0000-0000-000000000001', CURRENT_DATE - INTERVAL '35 days',
+  '{"math":3.5,"reading":2.8,"science":1.9,"english":2.6,"comprehension":2.2}'),
+('bbbb0001-0000-0000-0000-000000000001', CURRENT_DATE - INTERVAL '28 days',
+  '{"math":3.2,"reading":2.6,"science":1.8,"english":2.6,"comprehension":2.2}'),
+('bbbb0001-0000-0000-0000-000000000001', CURRENT_DATE - INTERVAL '21 days',
+  '{"math":2.9,"reading":2.4,"science":1.8,"english":2.5,"comprehension":2.1}'),
+('bbbb0001-0000-0000-0000-000000000001', CURRENT_DATE - INTERVAL '14 days',
+  '{"math":2.6,"reading":2.2,"science":1.8,"english":2.5,"comprehension":2.1}'),
+('bbbb0001-0000-0000-0000-000000000001', CURRENT_DATE - INTERVAL '7 days',
+  '{"math":2.3,"reading":2.0,"science":1.8,"english":2.5,"comprehension":2.1}')
+ON CONFLICT (student_id, week_start) DO NOTHING;
 
+-- 8 weeks of historical sessions for green students and Priya (so Foundation Pulse works)
+-- Priya sessions (weekly for 8 weeks, paired with Ravi Kumar)
+INSERT INTO sessions (offline_id, student_id, mentor_id, session_date, subjects_covered, skill_ratings, note, synced) VALUES
+('seed-priya-w8', 'bbbb0001-0000-0000-0000-000000000001', 'aaaa0001-0000-0000-0000-000000000001',
+  CURRENT_DATE - INTERVAL '56 days', ARRAY['math'], '{"math":"steady"}', 'Struggled with carrying', true),
+('seed-priya-w7', 'bbbb0001-0000-0000-0000-000000000001', 'aaaa0001-0000-0000-0000-000000000001',
+  CURRENT_DATE - INTERVAL '49 days', ARRAY['math'], '{"math":"steady"}', 'Practicing 3-digit subtraction', true),
+('seed-priya-w6', 'bbbb0001-0000-0000-0000-000000000001', 'aaaa0001-0000-0000-0000-000000000001',
+  CURRENT_DATE - INTERVAL '42 days', ARRAY['math','reading'], '{"math":"improving","reading":"steady"}', 'Carrying clicked! Used house method.', true),
+('seed-priya-w5', 'bbbb0001-0000-0000-0000-000000000001', 'aaaa0001-0000-0000-0000-000000000001',
+  CURRENT_DATE - INTERVAL '35 days', ARRAY['math','reading'], '{"math":"improving","reading":"improving"}', 'Good session with fractions', true),
+('seed-priya-w4', 'bbbb0001-0000-0000-0000-000000000001', 'aaaa0001-0000-0000-0000-000000000001',
+  CURRENT_DATE - INTERVAL '28 days', ARRAY['math'], '{"math":"improving"}', 'Multiplication tables 6 and 7', true),
+('seed-priya-w3', 'bbbb0001-0000-0000-0000-000000000001', 'aaaa0001-0000-0000-0000-000000000001',
+  CURRENT_DATE - INTERVAL '21 days', ARRAY['math','comprehension'], '{"math":"improving","comprehension":"steady"}', 'Main idea exercise done', true),
+('seed-priya-w2', 'bbbb0001-0000-0000-0000-000000000001', 'aaaa0001-0000-0000-0000-000000000001',
+  CURRENT_DATE - INTERVAL '14 days', ARRAY['math'], '{"math":"improving"}', 'Decimal point introduced', true),
+('seed-priya-w1', 'bbbb0001-0000-0000-0000-000000000001', 'aaaa0001-0000-0000-0000-000000000001',
+  CURRENT_DATE - INTERVAL '7 days', ARRAY['math','reading'], '{"math":"improving","reading":"improving"}', 'Good progress overall', true)
+ON CONFLICT (offline_id) DO NOTHING;
+
+-- Sessions for green students (last 4 weeks)
+INSERT INTO sessions (offline_id, student_id, mentor_id, session_date, subjects_covered, skill_ratings, note, synced) VALUES
+('seed-lakshmi-1', 'bbbb0009-0000-0000-0000-000000000009', 'aaaa0002-0000-0000-0000-000000000002',
+  CURRENT_DATE - INTERVAL '3 days', ARRAY['reading','comprehension'], '{"reading":"improving","comprehension":"improving"}', 'Story level reading achieved', true),
+('seed-deepak-1', 'bbbb0010-0000-0000-0000-000000000010', 'aaaa0001-0000-0000-0000-000000000001',
+  CURRENT_DATE - INTERVAL '5 days', ARRAY['math','science'], '{"math":"improving","science":"steady"}', 'Place value mastered', true),
+('seed-pooja-1', 'bbbb0011-0000-0000-0000-000000000011', 'aaaa0004-0000-0000-0000-000000000004',
+  CURRENT_DATE - INTERVAL '2 days', ARRAY['reading'], '{"reading":"improving"}', 'Read aloud with expression', true),
+('seed-kiran-1', 'bbbb0012-0000-0000-0000-000000000012', 'aaaa0005-0000-0000-0000-000000000005',
+  CURRENT_DATE - INTERVAL '4 days', ARRAY['math','science'], '{"math":"improving","science":"improving"}', 'Excellent fraction work', true)
+ON CONFLICT (offline_id) DO NOTHING;
