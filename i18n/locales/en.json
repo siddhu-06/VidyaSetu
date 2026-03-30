@@ -1,0 +1,61 @@
+{
+  "common": {
+    "appName": "VidyaSetu",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "offline": "Offline",
+    "online": "Online"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "session": "Session Logger",
+    "students": "Students",
+    "mentors": "Mentors",
+    "passport": "Passport"
+  },
+  "login": {
+    "title": "Sign in with a magic link",
+    "subtitle": "Built for NGO field teams working across low-connectivity communities.",
+    "email": "Email address",
+    "sendLink": "Send magic link",
+    "offlineHint": "Login needs internet once. After that, session logging works offline."
+  },
+  "session": {
+    "title": "60-second session logger",
+    "subtitle": "Capture tutoring evidence even when the network disappears.",
+    "studentLabel": "Student",
+    "mentorLabel": "Mentor",
+    "notesLabel": "Observation notes",
+    "saveOffline": "Save offline",
+    "queued": "Session saved on device and ready to sync."
+  },
+  "dashboard": {
+    "title": "Foundation Pulse",
+    "subtitle": "Live operational health across mentors, students and learning risk.",
+    "quickStats": "Quick stats",
+    "riskHeatmap": "Risk heatmap",
+    "leaderboard": "Volunteer leaderboard",
+    "csr": "Export CSR PDF"
+  },
+  "passport": {
+    "title": "Learning Passport",
+    "timeline": "Session timeline",
+    "skills": "Skill radar",
+    "share": "Share passport"
+  },
+  "mentor": {
+    "title": "Smart mentor match",
+    "signals": "Matching signals",
+    "recommended": "Recommended"
+  },
+  "sync": {
+    "idle": "Ready for offline logging.",
+    "queued": "Session queued on device.",
+    "syncing": "Syncing to cloud...",
+    "synced": "All offline work synced.",
+    "error": "Sync needs attention."
+  }
+}
+

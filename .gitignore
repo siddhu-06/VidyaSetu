@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.next-build-verify/
+.env.local
+.env
+tsconfig.tsbuildinfo
+coverage/
+dist/
+

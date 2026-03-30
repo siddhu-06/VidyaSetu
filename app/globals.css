@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Segoe UI', 'Noto Sans', sans-serif;
+}
+
+::selection {
+  background-color: rgba(16, 185, 129, 0.2);
+}
+
