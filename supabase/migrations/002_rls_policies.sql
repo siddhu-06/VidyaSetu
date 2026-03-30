@@ -1,178 +1,97 @@
-alter table public.mentors enable row level security;
-alter table public.students enable row level security;
-alter table public.session_templates enable row level security;
-alter table public.sessions enable row level security;
-alter table public.passport_shares enable row level security;
-alter table public.parent_messages enable row level security;
-alter table public.risk_snapshots enable row level security;
-alter table public.mentor_matches enable row level security;
+-- Enable RLS on all tables
+ALTER TABLE ngos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE centers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mentors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE parent_contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sms_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gap_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE coordinator_alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
-drop policy if exists mentors_authenticated_read on public.mentors;
-create policy mentors_authenticated_read
-on public.mentors
-for select
-to authenticated
-using (true);
+-- Helper function: get current user's role
+CREATE OR REPLACE FUNCTION get_user_role()
+RETURNS TEXT AS $$
+  SELECT role FROM user_profiles WHERE id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER;
 
-drop policy if exists mentors_authenticated_write on public.mentors;
-create policy mentors_authenticated_write
-on public.mentors
-for all
-to authenticated
-using (true)
-with check (true);
+-- Helper function: get current user's ngo_id
+CREATE OR REPLACE FUNCTION get_user_ngo_id()
+RETURNS UUID AS $$
+  SELECT ngo_id FROM user_profiles WHERE id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER;
 
-drop policy if exists students_authenticated_read on public.students;
-create policy students_authenticated_read
-on public.students
-for select
-to authenticated
-using (true);
+-- Helper function: get current user's mentor id
+CREATE OR REPLACE FUNCTION get_mentor_id()
+RETURNS UUID AS $$
+  SELECT id FROM mentors WHERE user_id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER;
 
-drop policy if exists students_authenticated_write on public.students;
-create policy students_authenticated_write
-on public.students
-for all
-to authenticated
-using (true)
-with check (true);
+-- STUDENTS policies
+CREATE POLICY "Mentors read own center students" ON students
+  FOR SELECT USING (
+    center_id IN (
+      SELECT center_id FROM mentors WHERE user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Coordinators read NGO students" ON students
+  FOR SELECT USING (
+    get_user_role() IN ('coordinator', 'admin') AND
+    center_id IN (SELECT id FROM centers WHERE ngo_id = get_user_ngo_id())
+  );
+CREATE POLICY "Coordinators update students" ON students
+  FOR UPDATE USING (
+    get_user_role() IN ('coordinator', 'admin') AND
+    center_id IN (SELECT id FROM centers WHERE ngo_id = get_user_ngo_id())
+  );
+CREATE POLICY "Service role full access students" ON students
+  USING (auth.role() = 'service_role');
 
-drop policy if exists students_public_passport_read on public.students;
-create policy students_public_passport_read
-on public.students
-for select
-to anon
-using (
-  exists (
-    select 1
-    from public.passport_shares
-    where passport_shares.student_id = students.id
-      and passport_shares.active = true
-  )
-);
+-- SESSIONS policies
+CREATE POLICY "Mentors insert own sessions" ON sessions
+  FOR INSERT WITH CHECK (mentor_id = get_mentor_id());
+CREATE POLICY "Mentors read own sessions" ON sessions
+  FOR SELECT USING (mentor_id = get_mentor_id());
+CREATE POLICY "Coordinators read NGO sessions" ON sessions
+  FOR SELECT USING (
+    get_user_role() IN ('coordinator', 'admin') AND
+    student_id IN (
+      SELECT s.id FROM students s
+      JOIN centers c ON s.center_id = c.id
+      WHERE c.ngo_id = get_user_ngo_id()
+    )
+  );
+CREATE POLICY "Service role full access sessions" ON sessions
+  USING (auth.role() = 'service_role');
 
-drop policy if exists templates_authenticated_read on public.session_templates;
-create policy templates_authenticated_read
-on public.session_templates
-for select
-to authenticated
-using (true);
+-- MENTORS policies
+CREATE POLICY "Anyone in NGO can read mentors" ON mentors
+  FOR SELECT USING (
+    center_id IN (SELECT id FROM centers WHERE ngo_id = get_user_ngo_id())
+  );
+CREATE POLICY "Mentors update own profile" ON mentors
+  FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "Service role full access mentors" ON mentors
+  USING (auth.role() = 'service_role');
 
-drop policy if exists templates_authenticated_write on public.session_templates;
-create policy templates_authenticated_write
-on public.session_templates
-for all
-to authenticated
-using (true)
-with check (true);
+-- SMS_LOG, GAP_HISTORY: coordinators read, service role full access
+CREATE POLICY "Coordinators read sms_log" ON sms_log
+  FOR SELECT USING (get_user_role() IN ('coordinator', 'admin'));
+CREATE POLICY "Service role full access sms_log" ON sms_log
+  USING (auth.role() = 'service_role');
 
-drop policy if exists sessions_authenticated_read on public.sessions;
-create policy sessions_authenticated_read
-on public.sessions
-for select
-to authenticated
-using (true);
+CREATE POLICY "Coordinators read gap_history" ON gap_history
+  FOR SELECT USING (get_user_role() IN ('coordinator', 'admin'));
+CREATE POLICY "Mentors read own students gap_history" ON gap_history
+  FOR SELECT USING (
+    student_id IN (
+      SELECT id FROM students WHERE assigned_mentor_id = get_mentor_id()
+    )
+  );
+CREATE POLICY "Service role full access gap_history" ON gap_history
+  USING (auth.role() = 'service_role');
 
-drop policy if exists sessions_authenticated_write on public.sessions;
-create policy sessions_authenticated_write
-on public.sessions
-for all
-to authenticated
-using (true)
-with check (true);
-
-drop policy if exists sessions_public_passport_read on public.sessions;
-create policy sessions_public_passport_read
-on public.sessions
-for select
-to anon
-using (
-  exists (
-    select 1
-    from public.passport_shares
-    where passport_shares.student_id = sessions.student_id
-      and passport_shares.active = true
-  )
-);
-
-drop policy if exists shares_authenticated_read on public.passport_shares;
-create policy shares_authenticated_read
-on public.passport_shares
-for select
-to authenticated
-using (true);
-
-drop policy if exists shares_authenticated_write on public.passport_shares;
-create policy shares_authenticated_write
-on public.passport_shares
-for all
-to authenticated
-using (true)
-with check (true);
-
-drop policy if exists shares_public_read on public.passport_shares;
-create policy shares_public_read
-on public.passport_shares
-for select
-to anon
-using (active = true);
-
-drop policy if exists parent_messages_authenticated_read on public.parent_messages;
-create policy parent_messages_authenticated_read
-on public.parent_messages
-for select
-to authenticated
-using (true);
-
-drop policy if exists parent_messages_authenticated_write on public.parent_messages;
-create policy parent_messages_authenticated_write
-on public.parent_messages
-for all
-to authenticated
-using (true)
-with check (true);
-
-drop policy if exists risk_snapshots_authenticated_read on public.risk_snapshots;
-create policy risk_snapshots_authenticated_read
-on public.risk_snapshots
-for select
-to authenticated
-using (true);
-
-drop policy if exists risk_snapshots_authenticated_write on public.risk_snapshots;
-create policy risk_snapshots_authenticated_write
-on public.risk_snapshots
-for all
-to authenticated
-using (true)
-with check (true);
-
-drop policy if exists risk_snapshots_public_passport_read on public.risk_snapshots;
-create policy risk_snapshots_public_passport_read
-on public.risk_snapshots
-for select
-to anon
-using (
-  exists (
-    select 1
-    from public.passport_shares
-    where passport_shares.student_id = risk_snapshots.student_id
-      and passport_shares.active = true
-  )
-);
-
-drop policy if exists mentor_matches_authenticated_read on public.mentor_matches;
-create policy mentor_matches_authenticated_read
-on public.mentor_matches
-for select
-to authenticated
-using (true);
-
-drop policy if exists mentor_matches_authenticated_write on public.mentor_matches;
-create policy mentor_matches_authenticated_write
-on public.mentor_matches
-for all
-to authenticated
-using (true)
-with check (true);
-
+-- PUBLIC passport: anyone can read student passport data (read-only, limited columns)
+CREATE POLICY "Public read passport" ON students
+  FOR SELECT USING (true);  -- Restrict columns via API select, not RLS

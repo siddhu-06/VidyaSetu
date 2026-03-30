@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import type { MentorMatchResult } from '@/types';
+import type { LegacyMentorMatchResult as MentorMatchResult } from '@/types';
 
 interface MentorMatchCardProps {
   match: MentorMatchResult;
@@ -32,4 +32,3 @@ export function MentorMatchCard({ match }: MentorMatchCardProps) {
     </Card>
   );
 }
-

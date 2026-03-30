@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import type { DashboardStats } from '@/types';
+import type { LegacyDashboardStats as DashboardStats } from '@/types';
 
 interface QuickStatsProps {
   stats: DashboardStats;
@@ -43,4 +43,3 @@ export function QuickStats({ stats }: QuickStatsProps) {
     </div>
   );
 }
-

@@ -9,7 +9,7 @@ import { getQueuedSessionByOfflineId } from '@/lib/db/sessions';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { Database } from '@/lib/supabase/types';
 import { formatDateTime } from '@/lib/utils/date';
-import type { SessionRecord } from '@/types';
+import type { LegacySessionRecord as SessionRecord } from '@/types';
 
 function mapSession(row: Database['public']['Tables']['sessions']['Row']): SessionRecord {
   return {
@@ -126,4 +126,3 @@ export default function SessionDetailPage() {
     </div>
   );
 }
-

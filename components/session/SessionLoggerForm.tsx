@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { NoteField } from '@/components/session/NoteField';
 import { SkillRatingPicker } from '@/components/session/SkillRatingPicker';
 import { StudentSelector } from '@/components/session/StudentSelector';
-import { getCachedTemplates, cacheTemplates } from '@/lib/db/templates';
+import { cacheTemplates, getCachedTemplateRecords } from '@/lib/db/templates';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { sessionFormSchema } from '@/lib/utils/validation';
 import { useMentors } from '@/hooks/useMentors';
@@ -63,7 +63,7 @@ export function SessionLoggerForm() {
         const supabase = getSupabaseBrowserClient();
 
         if (!supabase) {
-          const cachedTemplates = await getCachedTemplates();
+          const cachedTemplates = await getCachedTemplateRecords();
 
           if (isMounted) {
             setTemplates(cachedTemplates);
@@ -93,7 +93,7 @@ export function SessionLoggerForm() {
           setTemplates(nextTemplates);
         }
       } catch (error) {
-        const cachedTemplates = await getCachedTemplates();
+        const cachedTemplates = await getCachedTemplateRecords();
 
         if (isMounted) {
           setTemplates(cachedTemplates);
@@ -374,4 +374,3 @@ export function SessionLoggerForm() {
     </Card>
   );
 }
-

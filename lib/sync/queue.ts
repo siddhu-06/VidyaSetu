@@ -1,44 +1,12 @@
-import type { QueuedSessionRecord } from '@/types';
+// lib/sync/queue.ts
+// Retry queue helper — exponential backoff calculator and queue state manager.
 
-const DEFAULT_RETRY_BASE_MS = 15_000;
-const MAX_RETRY_DELAY_MS = 10 * 60_000;
+const MAX_RETRIES = 5;
+const BACKOFF_BASE_MS = 1000;
 
-export function getRetryDelayMs(attempts: number, baseMs = DEFAULT_RETRY_BASE_MS): number {
-  const retryDelay = baseMs * 2 ** attempts;
-  return Math.min(retryDelay, MAX_RETRY_DELAY_MS);
+// Calculate exponential backoff delay. Capped at 30 seconds.
+export function calculateBackoff(attempts: number): number {
+  return Math.min(BACKOFF_BASE_MS * Math.pow(2, attempts), 30_000);
 }
 
-export function nextRetryIso(attempts: number, now = new Date()): string {
-  const retryAt = new Date(now.getTime() + getRetryDelayMs(attempts));
-  return retryAt.toISOString();
-}
-
-export function isEligibleForRetry(record: QueuedSessionRecord, now = new Date()): boolean {
-  if (record.syncStatus === 'queued') {
-    return true;
-  }
-
-  if (record.syncStatus !== 'error') {
-    return false;
-  }
-
-  if (!record.nextRetryAt) {
-    return true;
-  }
-
-  return new Date(record.nextRetryAt).getTime() <= now.getTime();
-}
-
-export function sortQueue(records: QueuedSessionRecord[]): QueuedSessionRecord[] {
-  return [...records].sort((left, right) => {
-    const leftPriority = left.syncStatus === 'error' ? 1 : 0;
-    const rightPriority = right.syncStatus === 'error' ? 1 : 0;
-
-    if (leftPriority !== rightPriority) {
-      return leftPriority - rightPriority;
-    }
-
-    return new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime();
-  });
-}
-
+export { MAX_RETRIES };

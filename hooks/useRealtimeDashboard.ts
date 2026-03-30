@@ -5,14 +5,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { getVidyasetuDB } from '@/lib/db';
 import { getQueuedSessions } from '@/lib/db/sessions';
-import { getCachedStudents } from '@/lib/db/students';
+import { getCachedStudentRecords } from '@/lib/db/students';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { Database } from '@/lib/supabase/types';
 import { isSameWeek } from '@/lib/utils/date';
 import type {
   DashboardHeatmapCell,
+  LegacyDashboardStats as DashboardStats,
   DashboardPulsePoint,
-  DashboardStats,
   LeaderboardEntry,
   MentorRecord,
   StudentRecord,
@@ -209,7 +209,7 @@ function buildSnapshot(
 async function loadCachedDashboard(): Promise<RealtimeDashboardSnapshot> {
   const db = await getVidyasetuDB();
   const [students, mentors, queuedSessions] = await Promise.all([
-    getCachedStudents(),
+    getCachedStudentRecords(),
     db.getAll('mentors'),
     getQueuedSessions(),
   ]);
@@ -325,4 +325,3 @@ export function useRealtimeDashboard() {
     queryFn: fetchRealtimeDashboard,
   });
 }
-

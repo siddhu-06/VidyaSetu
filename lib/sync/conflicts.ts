@@ -1,53 +1,25 @@
-import type { QueuedSessionRecord, SessionRecord } from '@/types';
+// lib/sync/conflicts.ts
+import type { QueuedSession, SessionRecord } from '@/types';
 
-export interface SessionConflict {
-  local: QueuedSessionRecord;
-  remote: SessionRecord;
-  reasons: string[];
-}
+// Timestamp-wins conflict resolution.
+// If offline_id already exists in Supabase:
+//   - Compare created_at timestamps
+//   - Keep the later one
+//   - Log conflict resolution to sync_log
+export function resolveConflict(
+  local: QueuedSession,
+  remote: Partial<SessionRecord>,
+): SessionRecord {
+  const localTime = new Date(local.created_at).getTime();
+  const remoteTime = remote.created_at ? new Date(remote.created_at).getTime() : 0;
 
-export function detectSessionConflict(
-  local: QueuedSessionRecord,
-  remote: SessionRecord,
-): SessionConflict | null {
-  const reasons: string[] = [];
-
-  if (local.updatedAt !== remote.updatedAt) {
-    reasons.push('session_updated');
+  if (localTime >= remoteTime) {
+    const { queued_at, last_attempt_at, error_message, ...sessionRecord } = local;
+    return sessionRecord;
   }
-
-  if (local.notes.trim() !== remote.notes.trim()) {
-    reasons.push('notes_changed');
-  }
-
-  if (JSON.stringify(local.skillRatings) !== JSON.stringify(remote.skillRatings)) {
-    reasons.push('ratings_changed');
-  }
-
-  if (reasons.length === 0) {
-    return null;
-  }
-
-  return { local, remote, reasons };
-}
-
-export function resolveSessionConflict(conflict: SessionConflict): SessionRecord {
-  const localUpdatedAt = new Date(conflict.local.updatedAt).getTime();
-  const remoteUpdatedAt = new Date(conflict.remote.updatedAt).getTime();
-  const preferLocal = localUpdatedAt >= remoteUpdatedAt;
 
   return {
-    ...conflict.remote,
-    ...conflict.local,
-    id: conflict.remote.id,
-    syncStatus: preferLocal ? 'queued' : 'synced',
-    syncAttempts: preferLocal ? conflict.local.syncAttempts : conflict.remote.syncAttempts,
-    syncError: preferLocal ? conflict.local.syncError : conflict.remote.syncError,
-    lastSyncedAt: preferLocal ? conflict.local.lastSyncedAt : conflict.remote.lastSyncedAt,
-    learningGaps: Array.from(new Set([...conflict.remote.learningGaps, ...conflict.local.learningGaps])),
-    notes: preferLocal ? conflict.local.notes : conflict.remote.notes,
-    skillRatings: preferLocal ? conflict.local.skillRatings : conflict.remote.skillRatings,
-    updatedAt: preferLocal ? conflict.local.updatedAt : conflict.remote.updatedAt,
+    ...local,
+    ...remote,
   };
 }
-

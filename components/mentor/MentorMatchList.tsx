@@ -1,6 +1,6 @@
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MentorMatchCard } from '@/components/mentor/MentorMatchCard';
-import type { MentorMatchResult } from '@/types';
+import type { LegacyMentorMatchResult as MentorMatchResult } from '@/types';
 
 interface MentorMatchListProps {
   matches: MentorMatchResult[];
@@ -24,4 +24,3 @@ export function MentorMatchList({ matches }: MentorMatchListProps) {
     </div>
   );
 }
-

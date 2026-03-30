@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { readTestAccessSession } from '@/lib/utils/testAccess';
+import { useAppStore } from '@/store';
 
 export default function HomePage() {
   const router = useRouter();
+  const setCurrentRole = useAppStore((state) => state.setCurrentRole);
   const [message, setMessage] = useState('Checking your session…');
 
   useEffect(() => {
@@ -15,6 +18,14 @@ export default function HomePage() {
 
     async function resolveInitialRoute(): Promise<void> {
       try {
+        const localTestSession = readTestAccessSession();
+
+        if (localTestSession) {
+          setCurrentRole(localTestSession.role);
+          router.replace('/dashboard');
+          return;
+        }
+
         const supabase = getSupabaseBrowserClient();
 
         if (!supabase) {
@@ -46,7 +57,7 @@ export default function HomePage() {
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [router, setCurrentRole]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
@@ -60,4 +71,3 @@ export default function HomePage() {
     </div>
   );
 }
-

@@ -8,7 +8,11 @@ import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { PrintablePassport } from '@/components/passport/PrintablePassport';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { scoreStudentRisk } from '@/lib/intelligence/riskScorer';
-import type { PassportSnapshot, SessionRecord, StudentRecord } from '@/types';
+import type {
+  LegacySessionRecord as SessionRecord,
+  PassportSnapshot,
+  StudentRecord,
+} from '@/types';
 
 function mapStudentRecord(row: {
   id: string;
@@ -250,4 +254,3 @@ export default function PublicPassportPage() {
     </div>
   );
 }
-

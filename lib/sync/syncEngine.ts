@@ -1,91 +1,175 @@
 'use client';
 
-import { getQueueMetrics, getQueuedSessions, removeQueuedSession, updateQueuedSession } from '@/lib/db/sessions';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
-import type { Database } from '@/lib/supabase/types';
-import { detectSessionConflict } from '@/lib/sync/conflicts';
-import { isEligibleForRetry, nextRetryIso, sortQueue } from '@/lib/sync/queue';
-import type { QueuedSessionRecord, SyncStatusSnapshot } from '@/types';
+import {
+  getFailedCount,
+  getPendingCount,
+  getPendingSessions,
+  incrementSyncAttempt,
+  markSessionFailed,
+  markSessionSynced,
+} from '@/lib/db/sessions';
+import { getDB } from '@/lib/db/index';
+import { createBrowserClient } from '@/lib/supabase/client';
+import { calculateBackoff, MAX_RETRIES } from './queue';
+import type { AppError, QueuedSession, SyncStatusSnapshot } from '@/types';
 
+const BATCH_SIZE = 10;
+const BACKGROUND_SYNC_TAG = 'session-sync-queue';
 const SYNC_EVENT_NAME = 'vidyasetu:sync-status';
-const BACKGROUND_SYNC_TAG = 'vidyasetu-sync-sessions';
+const COMPLETE_EVENT_NAME = 'vidyasetu:sync-complete';
 
-function dispatchSyncStatus(snapshot: SyncStatusSnapshot): void {
+export interface SyncResult {
+  synced: number;
+  failed: number;
+  errors: AppError[];
+}
+
+export interface BatchResult {
+  synced: string[];
+  failed: { offline_id: string; error: string }[];
+}
+
+interface SessionInsertPayload {
+  id?: string;
+  student_id: string;
+  mentor_id: string;
+  session_date: string;
+  subjects_covered: string[];
+  skill_ratings: Record<string, string>;
+  note: string;
+  raw_tags: string[];
+  synced: boolean;
+  synced_at: string | null;
+  created_at: string;
+  offline_id: string;
+  sync_attempts: number;
+  sync_failed: boolean;
+}
+
+interface SessionsTableClient {
+  upsert(
+    value: SessionInsertPayload,
+    options: { onConflict: string },
+  ): {
+    select(columns: string): {
+      single(): Promise<{
+        data: { id: string } | null;
+        error: { message: string } | null;
+      }>;
+    };
+  };
+}
+
+interface FunctionsClient {
+  invoke(
+    name: string,
+    options: { body: { session_ids: string[] } },
+  ): Promise<{
+    error: { message: string } | null;
+  }>;
+}
+
+let isSyncing = false;
+let lastSyncAt: string | null = null;
+
+async function buildQueueMetrics(): Promise<SyncStatusSnapshot['queueMetrics']> {
+  const [pendingCount, failedCount] = await Promise.all([getPendingCount(), getFailedCount()]);
+
+  return {
+    queued: Math.max(pendingCount - failedCount, 0),
+    syncing: isSyncing ? Math.min(pendingCount, BATCH_SIZE) : 0,
+    failed: failedCount,
+  };
+}
+
+async function dispatchSyncStatus(
+  state: SyncStatusSnapshot['state'],
+  message: string,
+): Promise<void> {
   if (typeof window === 'undefined') {
     return;
   }
 
-  window.dispatchEvent(new CustomEvent<SyncStatusSnapshot>(SYNC_EVENT_NAME, { detail: snapshot }));
+  const queueMetrics = await buildQueueMetrics();
+  window.dispatchEvent(
+    new CustomEvent<SyncStatusSnapshot>(SYNC_EVENT_NAME, {
+      detail: {
+        state,
+        queueMetrics,
+        lastSyncedAt: lastSyncAt,
+        message,
+      },
+    }),
+  );
 }
 
-async function updateSnapshot(
-  state: SyncStatusSnapshot['state'],
-  message: string,
-  lastSyncedAt: string | null,
-): Promise<void> {
-  const queueMetrics = await getQueueMetrics();
+async function recordSyncFailure(offlineId: string, error: string): Promise<void> {
+  const db = await getDB();
+  const existingSession = await db.get('session_queue', offlineId);
 
-  dispatchSyncStatus({
-    state,
-    queueMetrics,
-    lastSyncedAt,
-    message,
+  if (!existingSession) {
+    return;
+  }
+
+  await db.put('session_queue', {
+    ...existingSession,
+    error_message: error,
+    last_attempt_at: new Date().toISOString(),
   });
 }
 
-function serializeQueuedSession(
-  record: QueuedSessionRecord,
-): Database['public']['Tables']['sessions']['Insert'] {
+async function appendSyncLog(
+  offlineId: string,
+  event: 'syncing' | 'failed',
+  error?: string,
+): Promise<void> {
+  const db = await getDB();
+
+  try {
+    await db.add('sync_log', {
+      id: crypto.randomUUID(),
+      offline_id: offlineId,
+      event,
+      timestamp: new Date().toISOString(),
+      ...(error ? { error } : {}),
+    });
+  } catch {
+    // Sync logging should never break the user path.
+  }
+}
+
+function createSessionsTableClient(): SessionsTableClient {
+  const supabase = createBrowserClient();
+
   return {
-    offline_id: record.offlineId,
-    student_id: record.studentId,
-    mentor_id: record.mentorId,
-    template_id: record.templateId,
-    session_date: record.sessionDate,
-    started_at: record.startedAt,
-    duration_minutes: record.durationMinutes,
-    mode: record.mode,
-    attendance: record.attendance,
-    engagement_level: record.engagementLevel,
-    confidence_delta: record.confidenceDelta,
-    notes: record.notes,
-    learning_gaps: record.learningGaps,
-    skill_ratings: record.skillRatings,
-    sync_source: 'device',
+    upsert(value, options) {
+      return {
+        select(columns) {
+          return {
+            async single() {
+              const { data, error } = await supabase
+                .from('sessions')
+                .upsert(value as never, options)
+                .select(columns)
+                .single();
+              const rawData = data as { id?: string | number } | null;
+
+              return {
+                data:
+                  rawData && typeof rawData === 'object' && 'id' in rawData
+                    ? { id: String(rawData.id) }
+                    : null,
+                error: error ? { message: error.message } : null,
+              };
+            },
+          };
+        },
+      };
+    },
   };
 }
 
-function mapRemoteSession(
-  record: QueuedSessionRecord,
-  row: Database['public']['Tables']['sessions']['Row'],
-): QueuedSessionRecord {
-  return {
-    id: row.id,
-    offlineId: row.offline_id,
-    studentId: row.student_id,
-    mentorId: row.mentor_id,
-    templateId: row.template_id,
-    sessionDate: row.session_date,
-    startedAt: row.started_at,
-    durationMinutes: row.duration_minutes,
-    mode: row.mode as QueuedSessionRecord['mode'],
-    attendance: row.attendance as QueuedSessionRecord['attendance'],
-    engagementLevel: row.engagement_level as QueuedSessionRecord['engagementLevel'],
-    confidenceDelta: row.confidence_delta as QueuedSessionRecord['confidenceDelta'],
-    notes: row.notes,
-    learningGaps: row.learning_gaps,
-    skillRatings: row.skill_ratings as QueuedSessionRecord['skillRatings'],
-    syncStatus: 'synced',
-    syncAttempts: record.syncAttempts,
-    syncError: null,
-    lastSyncedAt: row.updated_at,
-    nextRetryAt: null,
-    serverId: row.id,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
+/*
 export async function syncPendingSessions(): Promise<number> {
   const supabase = getSupabaseBrowserClient();
 
@@ -192,6 +276,229 @@ export async function requestBackgroundSync(): Promise<boolean> {
     await syncRegistration.sync.register(BACKGROUND_SYNC_TAG);
     return true;
   } catch (error) {
+    return false;
+  }
+}
+
+export function subscribeToSyncStatus(
+  callback: (snapshot: SyncStatusSnapshot) => void,
+): () => void {
+  if (typeof window === 'undefined') {
+    return () => undefined;
+  }
+
+  const handler = (event: Event): void => {
+    const customEvent = event as CustomEvent<SyncStatusSnapshot>;
+    callback(customEvent.detail);
+  };
+
+  window.addEventListener(SYNC_EVENT_NAME, handler);
+
+  return () => {
+    window.removeEventListener(SYNC_EVENT_NAME, handler);
+  };
+}
+*/
+
+export async function drainQueue(): Promise<SyncResult> {
+  if (isSyncing) {
+    return { synced: 0, failed: 0, errors: [] };
+  }
+
+  isSyncing = true;
+
+  const result: SyncResult = { synced: 0, failed: 0, errors: [] };
+
+  try {
+    await dispatchSyncStatus('syncing', 'Syncing offline sessions...');
+
+    const pending = await getPendingSessions();
+    const eligible = pending.filter((session) => session.sync_attempts < MAX_RETRIES && !session.sync_failed);
+
+    for (let index = 0; index < eligible.length; index += BATCH_SIZE) {
+      const batch = eligible.slice(index, index + BATCH_SIZE);
+      const batchResult = await syncBatch(batch);
+
+      result.synced += batchResult.synced.length;
+      result.failed += batchResult.failed.length;
+
+      for (const failedSession of batchResult.failed) {
+        result.errors.push({
+          code: 'SYNC_FAILED',
+          message: failedSession.error,
+        });
+      }
+
+      if (batchResult.synced.length > 0) {
+        await triggerIntelligence(batchResult.synced).catch((error: Error) => {
+          console.error(error);
+        });
+      }
+    }
+
+    const overLimit = (await getPendingSessions()).filter((session) => session.sync_attempts >= MAX_RETRIES);
+
+    for (const session of overLimit) {
+      await markSessionFailed(session.offline_id, session.error_message ?? 'Max retries exceeded');
+    }
+
+    if (result.synced > 0) {
+      lastSyncAt = new Date().toISOString();
+    }
+
+    const finalState =
+      result.failed > 0
+        ? 'queued'
+        : result.synced > 0
+          ? 'synced'
+          : 'idle';
+    const finalMessage =
+      result.failed > 0
+        ? 'Some sessions need another sync attempt.'
+        : result.synced > 0
+          ? 'Offline sessions are synced.'
+          : 'No offline sessions are waiting to sync.';
+
+    await dispatchSyncStatus(finalState, finalMessage);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent<SyncResult>(COMPLETE_EVENT_NAME, {
+          detail: result,
+        }),
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown sync error';
+    result.errors.push({
+      code: 'SYNC_ENGINE_ERROR',
+      message,
+    });
+
+    await dispatchSyncStatus('error', message);
+  } finally {
+    isSyncing = false;
+  }
+
+  return result;
+}
+
+async function syncBatch(sessions: QueuedSession[]): Promise<BatchResult> {
+  const sessionsTable = createSessionsTableClient();
+  const synced: string[] = [];
+  const failed: { offline_id: string; error: string }[] = [];
+
+  for (const session of sessions) {
+    try {
+      await incrementSyncAttempt(session.offline_id);
+      await appendSyncLog(session.offline_id, 'syncing');
+
+      const { queued_at, last_attempt_at, error_message, ...sessionData } = session;
+      const { data, error } = await sessionsTable
+        .upsert(
+          {
+            ...sessionData,
+            skill_ratings: sessionData.skill_ratings as Record<string, string>,
+            synced: true,
+            synced_at: new Date().toISOString(),
+          },
+          { onConflict: 'offline_id' },
+        )
+        .select('id')
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (!data) {
+        throw new Error('No data returned from upsert');
+      }
+
+      await markSessionSynced(session.offline_id, data.id);
+      synced.push(data.id);
+    } catch (err) {
+      const baseMessage = err instanceof Error ? err.message : 'Unknown sync error';
+      const nextAttempt = session.sync_attempts + 1;
+      const retryDelay = calculateBackoff(nextAttempt);
+      const surfacedMessage =
+        nextAttempt >= MAX_RETRIES ? baseMessage : `${baseMessage} Retrying in ${retryDelay}ms.`;
+
+      failed.push({ offline_id: session.offline_id, error: surfacedMessage });
+
+      if (nextAttempt >= MAX_RETRIES) {
+        await markSessionFailed(session.offline_id, baseMessage);
+      } else {
+        await recordSyncFailure(session.offline_id, baseMessage);
+        await appendSyncLog(session.offline_id, 'failed', baseMessage);
+      }
+    }
+  }
+
+  return { synced, failed };
+}
+
+async function triggerIntelligence(sessionIds: string[]): Promise<void> {
+  const supabase = createBrowserClient();
+  const functionsClient = supabase.functions as FunctionsClient;
+  const { error } = await functionsClient.invoke('gap-detector', {
+    body: { session_ids: sessionIds },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export function registerBackgroundSync(): void {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('SyncManager' in window)) {
+    return;
+  }
+
+  void navigator.serviceWorker.ready
+    .then((registration) => {
+      const syncRegistration = registration as ServiceWorkerRegistration & {
+        sync: {
+          register(tag: string): Promise<void>;
+        };
+      };
+
+      return syncRegistration.sync.register(BACKGROUND_SYNC_TAG);
+    })
+    .catch((error: Error) => {
+      console.error(error);
+    });
+}
+
+export async function forceSyncNow(): Promise<SyncResult> {
+  return drainQueue();
+}
+
+export function getSyncingState(): boolean {
+  return isSyncing;
+}
+
+export async function syncPendingSessions(): Promise<number> {
+  const result = await drainQueue();
+  return result.synced;
+}
+
+export async function requestBackgroundSync(): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('SyncManager' in window)) {
+    return false;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const syncRegistration = registration as ServiceWorkerRegistration & {
+      sync: {
+        register(tag: string): Promise<void>;
+      };
+    };
+
+    await syncRegistration.sync.register(BACKGROUND_SYNC_TAG);
+    return true;
+  } catch {
     return false;
   }
 }

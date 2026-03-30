@@ -32,3 +32,12 @@ export function getSupabaseBrowserClient(): SupabaseClient<Database> | null {
   return browserClient;
 }
 
+export function createBrowserClient(): SupabaseClient<Database> {
+  const client = getSupabaseBrowserClient();
+
+  if (!client) {
+    throw new Error('Supabase is not configured on this device.');
+  }
+
+  return client;
+}

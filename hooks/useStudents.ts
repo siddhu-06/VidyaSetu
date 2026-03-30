@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import { cacheStudents, getCachedStudentById, getCachedStudents } from '@/lib/db/students';
+import { cacheStudents, getCachedStudentById, getCachedStudentRecords } from '@/lib/db/students';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { Database } from '@/lib/supabase/types';
 import type { StudentRecord } from '@/types';
@@ -37,7 +37,7 @@ async function fetchStudents(): Promise<StudentRecord[]> {
   const supabase = getSupabaseBrowserClient();
 
   if (!supabase) {
-    return getCachedStudents();
+    return getCachedStudentRecords();
   }
 
   try {
@@ -52,7 +52,7 @@ async function fetchStudents(): Promise<StudentRecord[]> {
 
     return students;
   } catch (error) {
-    const cachedStudents = await getCachedStudents();
+    const cachedStudents = await getCachedStudentRecords();
 
     if (cachedStudents.length > 0) {
       return cachedStudents;
@@ -105,4 +105,3 @@ export function useStudent(studentId: string) {
     enabled: studentId.length > 0,
   });
 }
-

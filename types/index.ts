@@ -1,6 +1,233 @@
-export type AppLocale = 'en' | 'hi' | 'te';
+// types/index.ts — COMPLETE TYPE DEFINITIONS
 
-export type AppRole = 'mentor' | 'coordinator' | 'viewer';
+export type Subject =
+  | 'math'
+  | 'reading'
+  | 'science'
+  | 'english'
+  | 'comprehension';
+
+export const SUBJECTS: Subject[] = [
+  'math',
+  'reading',
+  'science',
+  'english',
+  'comprehension',
+];
+
+export const SUBJECT_LABELS: Record<Subject, string> = {
+  math: 'Mathematics',
+  reading: 'Reading Fluency',
+  science: 'Science',
+  english: 'English',
+  comprehension: 'Comprehension',
+};
+
+export type SkillRating = 'improving' | 'steady' | 'not_covered';
+
+export const SKILL_RATINGS: SkillRating[] = ['improving', 'steady', 'not_covered'];
+
+export const SKILL_RATING_LABELS: Record<SkillRating, string> = {
+  improving: 'Improving',
+  steady: 'Steady',
+  not_covered: 'Not Covered',
+};
+
+export type RiskColor = 'green' | 'amber' | 'red';
+
+export type Language = 'hi' | 'te' | 'en';
+
+export type UserRole = 'mentor' | 'coordinator' | 'admin';
+
+export interface GapProfile {
+  math: number;
+  reading: number;
+  science: number;
+  english: number;
+  comprehension: number;
+}
+
+export const DEFAULT_GAP_PROFILE: GapProfile = {
+  math: 0,
+  reading: 0,
+  science: 0,
+  english: 0,
+  comprehension: 0,
+};
+
+export interface Student {
+  id: string;
+  name: string;
+  grade: 3 | 4 | 5 | 6;
+  gender: 'M' | 'F' | 'other';
+  center_id: string;
+  assigned_mentor_id: string | null;
+  gap_profile: GapProfile;
+  risk_score: number;
+  risk_color: RiskColor;
+  last_session_at: string | null;
+  engagement_score: number;
+  preferred_time_slot: string | null;
+  parent_language: Language;
+  created_at: string;
+}
+
+export interface Mentor {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string;
+  subjects: Subject[];
+  availability: Record<string, [string, string]>;
+  center_id: string;
+  gender: string;
+  session_count: number;
+  avg_student_improvement: number;
+  active_student_count: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface Center {
+  id: string;
+  name: string;
+  city: string;
+  ngo_id: string;
+  created_at: string;
+}
+
+export interface NGO {
+  id: string;
+  name: string;
+  contact_email: string;
+  twilio_from_number: string | null;
+  created_at: string;
+}
+
+export interface SessionRecord {
+  id?: string;
+  student_id: string;
+  mentor_id: string;
+  session_date: string;
+  subjects_covered: Subject[];
+  skill_ratings: Partial<Record<Subject, SkillRating>>;
+  note: string;
+  raw_tags: string[];
+  synced: boolean;
+  synced_at: string | null;
+  created_at: string;
+  offline_id: string;
+  sync_attempts: number;
+  sync_failed: boolean;
+}
+
+export interface QueuedSession extends SessionRecord {
+  queued_at: string;
+  last_attempt_at: string | null;
+  error_message: string | null;
+}
+
+export interface SessionTemplate {
+  id: string;
+  title: string;
+  grade: 3 | 4 | 5 | 6;
+  subject: Subject;
+  gap_tag: string;
+  warm_up: string;
+  core_concept: string;
+  closing_activity: string;
+  duration_minutes: number;
+  offline_cached: boolean;
+}
+
+export interface MentorMatchSignals {
+  subjectFit: number;
+  availability: number;
+  loadBalance: number;
+  outcomeHistory: number;
+  genderSafety: number;
+}
+
+export interface MentorMatchResult {
+  mentor: Mentor;
+  totalScore: number;
+  signals: MentorMatchSignals;
+  explanation: string;
+  rank: 1 | 2 | 3;
+}
+
+export interface SyncStatus {
+  pendingCount: number;
+  failedCount: number;
+  lastSyncAt: string | null;
+  isSyncing: boolean;
+  lastError: string | null;
+}
+
+export interface RiskAlert {
+  student_id: string;
+  student_name: string;
+  risk_color: RiskColor;
+  risk_score: number;
+  signals: {
+    attendanceDrop: boolean;
+    gapStagnation: boolean;
+    parentSilence: boolean;
+  };
+  created_at: string;
+}
+
+export interface SMSLog {
+  id: string;
+  student_id: string;
+  session_id: string;
+  phone: string;
+  message_body: string;
+  twilio_sid: string;
+  reply: string | null;
+  sentiment: 1 | -1 | null;
+  created_at: string;
+}
+
+export interface DashboardStats {
+  totalStudents: number;
+  activeStudents: number;
+  activeMentors: number;
+  sessionsThisMonth: number;
+  avgRiskScore: number;
+  parentEngagementRate: number;
+  redCount: number;
+  amberCount: number;
+  greenCount: number;
+}
+
+export interface GapHistoryPoint {
+  week: string;
+  math: number;
+  reading: number;
+  science: number;
+  english: number;
+  comprehension: number;
+}
+
+export interface RealtimeSessionPayload {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: SessionRecord;
+  old: Partial<SessionRecord>;
+}
+
+export interface AppError {
+  code: string;
+  message: string;
+  details?: string;
+}
+
+// Compatibility layer for the existing app while Module 03 becomes the
+// source of truth for downstream modules.
+
+export type AppLocale = Language;
+
+export type AppRole = UserRole | 'viewer';
 
 export type AttendanceStatus = 'present' | 'absent' | 'late';
 
@@ -88,7 +315,7 @@ export interface SessionTemplateRecord {
 
 export type SkillRatings = Record<SkillDomain, SkillScore>;
 
-export interface SessionRecord {
+export interface LegacySessionRecord {
   id: string;
   offlineId: string;
   studentId: string;
@@ -118,7 +345,7 @@ export interface QueueMetrics {
   failed: number;
 }
 
-export interface QueuedSessionRecord extends SessionRecord {
+export interface QueuedSessionRecord extends LegacySessionRecord {
   nextRetryAt: string | null;
   serverId: string | null;
 }
@@ -138,7 +365,7 @@ export interface GapDetectionResult {
   confidence: number;
 }
 
-export interface MentorMatchSignal {
+export interface LegacyMentorMatchSignal {
   key: MentorSignalKey;
   label: string;
   score: number;
@@ -146,17 +373,17 @@ export interface MentorMatchSignal {
   reason: string;
 }
 
-export interface MentorMatchResult {
+export interface LegacyMentorMatchResult {
   mentor: MentorRecord;
   totalScore: number;
   rationale: string;
   recommended: boolean;
-  signals: MentorMatchSignal[];
+  signals: LegacyMentorMatchSignal[];
 }
 
 export interface RiskAssessmentInput {
   student: StudentRecord;
-  sessions: SessionRecord[];
+  sessions: LegacySessionRecord[];
   latestParentResponse: ParentResponseCode | null;
 }
 
@@ -168,7 +395,7 @@ export interface RiskAssessmentResult {
   headline: string;
 }
 
-export interface DashboardStats {
+export interface LegacyDashboardStats {
   activeStudents: number;
   activeMentors: number;
   sessionsThisWeek: number;
@@ -238,7 +465,7 @@ export interface CSRReportData {
   donorName: string;
   reportingWindow: string;
   generatedAt: string;
-  stats: DashboardStats;
+  stats: LegacyDashboardStats;
   heatmap: DashboardHeatmapCell[];
   pulse: DashboardPulsePoint[];
   leaderboard: LeaderboardEntry[];
@@ -297,4 +524,3 @@ export interface DashboardRealtimePayload {
   entityId: string;
   occurredAt: string;
 }
-

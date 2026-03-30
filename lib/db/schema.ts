@@ -1,36 +1,45 @@
+// lib/db/schema.ts
 import type { DBSchema } from 'idb';
+import type { MentorRecord, QueuedSession, SessionTemplate, Student } from '@/types';
 
-import type {
-  MentorRecord,
-  QueuedSessionRecord,
-  SessionTemplateRecord,
-  StudentRecord,
-  SyncStatusSnapshot,
-} from '@/types';
-
-export interface SyncMetaRecord {
-  key: 'status';
-  value: SyncStatusSnapshot;
-}
-
-export interface VidyasetuDBSchema extends DBSchema {
-  sessionQueue: {
+export interface VidyaSetuDB extends DBSchema {
+  session_queue: {
     key: string;
-    value: QueuedSessionRecord;
+    value: QueuedSession;
     indexes: {
-      'by-status': string;
-      'by-student': string;
-      'by-updated-at': string;
-      'by-next-retry-at': string;
+      'by-synced': number;
+      'by-queued-at': string;
+      'by-student-id': string;
     };
   };
-  students: {
+  student_cache: {
     key: string;
-    value: StudentRecord;
+    value: Student & { cached_at: string };
     indexes: {
-      'by-locality': string;
-      'by-grade': string;
-      'by-updated-at': string;
+      'by-center-id': string;
+      'by-risk-color': string;
+    };
+  };
+  template_cache: {
+    key: string;
+    value: SessionTemplate;
+    indexes: {
+      'by-subject': string;
+      'by-grade': number;
+    };
+  };
+  sync_log: {
+    key: string;
+    value: {
+      id: string;
+      offline_id: string;
+      event: 'queued' | 'syncing' | 'synced' | 'failed';
+      timestamp: string;
+      error?: string;
+    };
+    indexes: {
+      'by-offline-id': string;
+      'by-event': string;
     };
   };
   mentors: {
@@ -39,23 +48,8 @@ export interface VidyasetuDBSchema extends DBSchema {
     indexes: {
       'by-locality': string;
       'by-grade': string;
-      'by-updated-at': string;
     };
-  };
-  sessionTemplates: {
-    key: string;
-    value: SessionTemplateRecord;
-    indexes: {
-      'by-duration': number;
-      'by-created-at': string;
-    };
-  };
-  syncMeta: {
-    key: string;
-    value: SyncMetaRecord;
   };
 }
 
-export const VIDYASETU_DB_NAME = 'vidyasetu-offline-db';
-export const VIDYASETU_DB_VERSION = 1;
-
+export type VidyaSetuCompatDB = VidyaSetuDB;

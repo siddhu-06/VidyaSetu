@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { canUseTestAccess, clearTestAccessSession, writeTestAccessSession } from '@/lib/utils/testAccess';
 import { loginSchema } from '@/lib/utils/validation';
 import { useAppStore } from '@/store';
 
@@ -33,6 +34,21 @@ export default function LoginPage() {
     try {
       setCurrentRole(role);
       const supabase = getSupabaseBrowserClient();
+
+      if (canUseTestAccess(parsedInput.data.email)) {
+        clearTestAccessSession();
+        writeTestAccessSession({
+          email: parsedInput.data.email,
+          role: parsedInput.data.role,
+        });
+        setMessage(`Local test access enabled for ${parsedInput.data.email}. Redirecting...`);
+
+        if (typeof window !== 'undefined') {
+          window.location.assign('/dashboard');
+        }
+
+        return;
+      }
 
       if (!supabase) {
         setMessage('Supabase is not configured yet. Add environment variables to enable magic-link login.');
@@ -101,6 +117,11 @@ export default function LoginPage() {
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
               Login needs internet once. After that, the session logger and cached pages continue to work offline.
             </div>
+            {process.env.NEXT_PUBLIC_TEST_ACCESS_EMAIL ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Local test access is enabled for {process.env.NEXT_PUBLIC_TEST_ACCESS_EMAIL}.
+              </div>
+            ) : null}
             {message ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                 {message}
@@ -120,4 +141,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

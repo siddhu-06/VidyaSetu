@@ -1,172 +1,150 @@
-create extension if not exists pgcrypto;
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = timezone('utc', now());
-  return new;
-end;
-$$;
-
-create table if not exists public.mentors (
-  id uuid primary key default gen_random_uuid(),
-  full_name text not null,
-  email text unique,
-  phone text not null,
-  languages text[] not null default array[]::text[],
-  focus_grades text[] not null default array[]::text[],
-  localities text[] not null default array[]::text[],
-  weekly_capacity integer not null default 4 check (weekly_capacity between 1 and 14),
-  sessions_completed integer not null default 0 check (sessions_completed >= 0),
-  consistency_score integer not null default 0 check (consistency_score between 0 and 100),
-  empathy_score integer not null default 0 check (empathy_score between 0 and 100),
-  teaching_score integer not null default 0 check (teaching_score between 0 and 100),
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+-- NGOs table
+CREATE TABLE ngos (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  contact_email TEXT,
+  twilio_from_number TEXT,
+  created_at  TIMESTAMPTZ DEFAULT now()
 );
 
-create table if not exists public.students (
-  id uuid primary key default gen_random_uuid(),
-  full_name text not null,
-  preferred_name text,
-  age integer not null check (age between 5 and 18),
-  grade text not null,
-  school_name text,
-  locality text not null,
-  migration_status text not null default 'stable' check (
-    migration_status in ('stable', 'seasonal', 'recently_migrated')
-  ),
-  baseline_reading_level integer not null default 3 check (baseline_reading_level between 1 and 5),
-  baseline_arithmetic_level integer not null default 3 check (baseline_arithmetic_level between 1 and 5),
-  attendance_rate numeric(5,2) not null default 100 check (attendance_rate between 0 and 100),
-  guardian_name text not null,
-  guardian_phone text not null,
-  preferred_language text not null default 'en' check (preferred_language in ('en', 'hi', 'te')),
-  sms_opt_in boolean not null default true,
-  last_session_at timestamptz,
-  active boolean not null default true,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+-- Centers table
+CREATE TABLE centers (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  city        TEXT NOT NULL,
+  ngo_id      UUID NOT NULL REFERENCES ngos(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ DEFAULT now()
 );
 
-create table if not exists public.session_templates (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  focus_skills text[] not null default array[]::text[],
-  note_hint text not null default '',
-  duration_minutes integer not null default 60 check (duration_minutes between 15 and 180),
-  created_at timestamptz not null default timezone('utc', now())
+-- Students table (forward-declares assigned_mentor_id, FK added after mentors)
+CREATE TABLE students (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                 TEXT NOT NULL,
+  grade                SMALLINT NOT NULL CHECK (grade BETWEEN 3 AND 6),
+  gender               TEXT NOT NULL DEFAULT 'M' CHECK (gender IN ('M','F','other')),
+  center_id            UUID NOT NULL REFERENCES centers(id) ON DELETE CASCADE,
+  assigned_mentor_id   UUID,
+  gap_profile          JSONB NOT NULL DEFAULT '{"math":0,"reading":0,"science":0,"english":0,"comprehension":0}',
+  risk_score           FLOAT NOT NULL DEFAULT 0.5 CHECK (risk_score BETWEEN 0 AND 1),
+  risk_color           TEXT NOT NULL DEFAULT 'amber' CHECK (risk_color IN ('green','amber','red')),
+  last_session_at      TIMESTAMPTZ,
+  engagement_score     FLOAT NOT NULL DEFAULT 0.5 CHECK (engagement_score BETWEEN 0 AND 1),
+  preferred_time_slot  TEXT,
+  parent_language      TEXT NOT NULL DEFAULT 'hi' CHECK (parent_language IN ('hi','te','en')),
+  created_at           TIMESTAMPTZ DEFAULT now()
 );
 
-create table if not exists public.sessions (
-  id uuid primary key default gen_random_uuid(),
-  offline_id text not null unique,
-  student_id uuid not null references public.students(id) on delete cascade,
-  mentor_id uuid not null references public.mentors(id) on delete restrict,
-  template_id uuid references public.session_templates(id) on delete set null,
-  session_date date not null,
-  started_at timestamptz,
-  duration_minutes integer not null check (duration_minutes between 15 and 180),
-  mode text not null check (mode in ('offline', 'online', 'phone', 'home-visit')),
-  attendance text not null check (attendance in ('present', 'absent', 'late')),
-  engagement_level integer not null check (engagement_level between 1 and 5),
-  confidence_delta integer not null default 0 check (confidence_delta between -2 and 2),
-  notes text not null,
-  learning_gaps text[] not null default array[]::text[],
-  skill_ratings jsonb not null default '{}'::jsonb check (jsonb_typeof(skill_ratings) = 'object'),
-  sync_source text not null default 'device' check (sync_source in ('device', 'server')),
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+CREATE INDEX idx_students_center_id ON students(center_id);
+CREATE INDEX idx_students_risk_color ON students(risk_color);
+CREATE INDEX idx_students_assigned_mentor ON students(assigned_mentor_id);
+
+-- Mentors table
+CREATE TABLE mentors (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id                 UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  name                    TEXT NOT NULL,
+  phone                   TEXT NOT NULL,
+  subjects                TEXT[] NOT NULL DEFAULT '{}',
+  availability            JSONB NOT NULL DEFAULT '{}',
+  center_id               UUID NOT NULL REFERENCES centers(id) ON DELETE CASCADE,
+  gender                  TEXT NOT NULL DEFAULT 'M',
+  session_count           INT NOT NULL DEFAULT 0,
+  avg_student_improvement FLOAT NOT NULL DEFAULT 0.5 CHECK (avg_student_improvement BETWEEN 0 AND 1),
+  active_student_count    INT NOT NULL DEFAULT 0,
+  active                  BOOLEAN NOT NULL DEFAULT true,
+  created_at              TIMESTAMPTZ DEFAULT now()
 );
 
-create table if not exists public.passport_shares (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid not null unique references public.students(id) on delete cascade,
-  public_code text not null unique,
-  active boolean not null default true,
-  last_viewed_at timestamptz,
-  created_at timestamptz not null default timezone('utc', now())
+-- Fix forward reference: students → mentors
+ALTER TABLE students
+  ADD CONSTRAINT students_assigned_mentor_id_fkey
+  FOREIGN KEY (assigned_mentor_id) REFERENCES mentors(id) ON DELETE SET NULL;
+
+-- Sessions table
+CREATE TABLE sessions (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  offline_id       TEXT NOT NULL UNIQUE,    -- client UUID for deduplication
+  student_id       UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  mentor_id        UUID NOT NULL REFERENCES mentors(id) ON DELETE CASCADE,
+  session_date     DATE NOT NULL,
+  subjects_covered TEXT[] NOT NULL DEFAULT '{}',
+  skill_ratings    JSONB NOT NULL DEFAULT '{}',
+  note             TEXT NOT NULL DEFAULT '',
+  raw_tags         TEXT[] NOT NULL DEFAULT '{}',
+  synced           BOOLEAN NOT NULL DEFAULT true,  -- true once in DB
+  synced_at        TIMESTAMPTZ DEFAULT now(),
+  created_at       TIMESTAMPTZ DEFAULT now()
 );
 
-create table if not exists public.parent_messages (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references public.students(id) on delete cascade,
-  direction text not null check (direction in ('outbound', 'inbound')),
-  channel text not null default 'sms' check (channel in ('sms')),
-  locale text not null check (locale in ('en', 'hi', 'te')),
-  body text not null,
-  delivery_status text not null default 'queued',
-  response_code text check (response_code in ('H', 'C', 'N')),
-  created_at timestamptz not null default timezone('utc', now())
+CREATE INDEX idx_sessions_student_id ON sessions(student_id);
+CREATE INDEX idx_sessions_mentor_id ON sessions(mentor_id);
+CREATE INDEX idx_sessions_session_date ON sessions(session_date DESC);
+CREATE INDEX idx_sessions_offline_id ON sessions(offline_id);
+
+-- Parent contacts
+CREATE TABLE parent_contacts (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id  UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE UNIQUE,
+  phone       TEXT NOT NULL,
+  language    TEXT NOT NULL DEFAULT 'hi' CHECK (language IN ('hi','te','en')),
+  sms_consent BOOLEAN NOT NULL DEFAULT true,
+  last_sms_at TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ DEFAULT now()
 );
 
-create table if not exists public.risk_snapshots (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references public.students(id) on delete cascade,
-  risk_score integer not null check (risk_score between 0 and 100),
-  risk_level text not null check (risk_level in ('low', 'moderate', 'high', 'critical')),
-  reason_codes text[] not null default array[]::text[],
-  calculated_at timestamptz not null default timezone('utc', now())
+-- SMS log
+CREATE TABLE sms_log (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id  UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  session_id  UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  phone       TEXT NOT NULL,
+  message_body TEXT NOT NULL,
+  twilio_sid  TEXT,
+  reply       TEXT,
+  sentiment   SMALLINT CHECK (sentiment IN (-1, 1)),
+  created_at  TIMESTAMPTZ DEFAULT now()
 );
 
-create table if not exists public.mentor_matches (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references public.students(id) on delete cascade,
-  mentor_id uuid not null references public.mentors(id) on delete cascade,
-  score numeric(5,2) not null check (score between 0 and 100),
-  signal_breakdown jsonb not null default '{}'::jsonb check (jsonb_typeof(signal_breakdown) = 'object'),
-  created_at timestamptz not null default timezone('utc', now())
+CREATE INDEX idx_sms_log_student_id ON sms_log(student_id);
+CREATE INDEX idx_sms_log_created_at ON sms_log(created_at DESC);
+
+-- Gap history (for Foundation Pulse healing chart)
+CREATE TABLE gap_history (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id  UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  week_start  DATE NOT NULL,
+  gap_profile JSONB NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(student_id, week_start)
 );
 
-create index if not exists mentors_localities_idx on public.mentors using gin (localities);
-create index if not exists mentors_focus_grades_idx on public.mentors using gin (focus_grades);
-create index if not exists students_locality_grade_idx on public.students (locality, grade);
-create index if not exists sessions_student_date_idx on public.sessions (student_id, session_date desc);
-create index if not exists sessions_mentor_date_idx on public.sessions (mentor_id, session_date desc);
-create index if not exists parent_messages_student_created_idx on public.parent_messages (student_id, created_at desc);
-create index if not exists risk_snapshots_student_created_idx on public.risk_snapshots (student_id, calculated_at desc);
+CREATE INDEX idx_gap_history_student_week ON gap_history(student_id, week_start DESC);
 
-drop trigger if exists set_mentors_updated_at on public.mentors;
-create trigger set_mentors_updated_at
-before update on public.mentors
-for each row
-execute function public.set_updated_at();
+-- Coordinator alerts
+CREATE TABLE coordinator_alerts (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id  UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  ngo_id      UUID NOT NULL REFERENCES ngos(id) ON DELETE CASCADE,
+  alert_type  TEXT NOT NULL,  -- 'risk_red', 'parent_silence', 'gap_stagnation'
+  resolved    BOOLEAN NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
 
-drop trigger if exists set_students_updated_at on public.students;
-create trigger set_students_updated_at
-before update on public.students
-for each row
-execute function public.set_updated_at();
+-- User profiles (extends auth.users)
+CREATE TABLE user_profiles (
+  id         UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  role       TEXT NOT NULL DEFAULT 'mentor' CHECK (role IN ('mentor','coordinator','admin')),
+  ngo_id     UUID REFERENCES ngos(id) ON DELETE SET NULL,
+  center_id  UUID REFERENCES centers(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 
-drop trigger if exists set_sessions_updated_at on public.sessions;
-create trigger set_sessions_updated_at
-before update on public.sessions
-for each row
-execute function public.set_updated_at();
-
-do $$
-begin
-  alter publication supabase_realtime add table public.sessions;
-exception
-  when duplicate_object then null;
-end;
-$$;
-
-do $$
-begin
-  alter publication supabase_realtime add table public.risk_snapshots;
-exception
-  when duplicate_object then null;
-end;
-$$;
-
-do $$
-begin
-  alter publication supabase_realtime add table public.parent_messages;
-exception
-  when duplicate_object then null;
-end;
-$$;
-
+-- Enable Realtime on key tables
+ALTER PUBLICATION supabase_realtime ADD TABLE sessions;
+ALTER PUBLICATION supabase_realtime ADD TABLE students;
+ALTER PUBLICATION supabase_realtime ADD TABLE sms_log;
+ALTER PUBLICATION supabase_realtime ADD TABLE coordinator_alerts;

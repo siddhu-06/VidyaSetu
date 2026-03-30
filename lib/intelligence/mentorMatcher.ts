@@ -1,4 +1,9 @@
-import type { MentorMatchResult, MentorMatchSignal, MentorRecord, StudentRecord } from '@/types';
+import type {
+  LegacyMentorMatchResult as MentorMatchResult,
+  LegacyMentorMatchSignal as MentorMatchSignal,
+  MentorRecord,
+  StudentRecord,
+} from '@/types';
 
 interface MentorMatchContext {
   activeAssignmentsByMentorId?: Record<string, number>;
@@ -130,4 +135,3 @@ export function rankMentorsForStudent(
     .map((mentor) => scoreMentorForStudent(student, mentor, context))
     .sort((left, right) => right.totalScore - left.totalScore);
 }
-
