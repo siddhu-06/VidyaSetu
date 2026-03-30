@@ -37,7 +37,18 @@ export type RiskColor = 'green' | 'amber' | 'red';
 
 export type Language = 'hi' | 'te' | 'en';
 
-export type UserRole = 'mentor' | 'coordinator' | 'admin';
+export type UserRole = 'ngo' | 'volunteer' | 'student';
+
+export interface Profile {
+  id: string;
+  role: UserRole;
+  first_name: string;
+  last_name: string;
+  city: string;
+  org_name?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface GapProfile {
   math: number;
@@ -227,7 +238,7 @@ export interface AppError {
 
 export type AppLocale = Language;
 
-export type AppRole = UserRole | 'viewer';
+export type AppRole = UserRole | 'mentor' | 'coordinator' | 'admin' | 'viewer';
 
 export type AttendanceStatus = 'present' | 'absent' | 'late';
 
