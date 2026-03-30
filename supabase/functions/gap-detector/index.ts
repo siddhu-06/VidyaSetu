@@ -254,7 +254,11 @@ function getWeekStartString(sessionDate: string): string {
 }
 
 async function logCoordinatorAlert(
-  supabase: ReturnType<typeof createClient>,
+  supabase: {
+    from: (table: 'coordinator_alerts') => {
+      insert: (values: { student_id: string; ngo_id: string; alert_type: string }) => unknown;
+    };
+  },
   studentId: string | null,
   ngoId: string | null,
 ): Promise<void> {

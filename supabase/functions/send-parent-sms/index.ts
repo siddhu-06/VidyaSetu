@@ -1,122 +1,124 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import twilio from 'npm:twilio@5.9.0';
-import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-type AppLocale = 'en' | 'hi' | 'te';
+const SMS_TEMPLATES: Record<string, (name: string, subject: string) => string> = {
+  hi: (name, subject) =>
+    `${name} ne aaj ${subject} ki class ki. Khush hain? H bhejo khush ke liye, C bhejo concern ke liye.`,
+  te: (name, subject) =>
+    `${name} ee roju ${subject} class chesindi. Santoshamga unnara? H pampa??i santhosham kosam, C pampa??i concern kosam.`,
+  en: (name, subject) =>
+    `${name} attended ${subject} class today. Happy? Reply H for happy, C for concern.`,
+};
 
-interface SmsContext {
-  childName: string;
-  mentorName: string;
-  sessionDateLabel: string;
-  progressHighlight: string;
-  concernFlag: boolean;
-}
+const RATE_LIMIT_HOURS = 6;
 
-interface SmsRequestBody {
-  studentId: string;
-  to: string;
-  locale: AppLocale;
-  context: SmsContext;
-}
-
-function buildParentUpdateSms(locale: AppLocale, context: SmsContext): string {
-  const concernLine =
-    context.concernFlag
-      ? {
-          en: 'Our team noticed a learning risk and will follow up.',
-          hi: 'हमें पढ़ाई में थोड़ी चिंता दिखी है, हमारी टीम संपर्क करेगी।',
-          te: 'అభ్యాసంలో ఒక జాగ్రత్త సూచన కనిపించింది, మా బృందం మిమ్మల్ని సంప్రదిస్తుంది.',
-        }[locale]
-      : {
-          en: 'Today’s session showed steady effort.',
-          hi: 'आज के सत्र में बच्चे ने अच्छा प्रयास किया।',
-          te: 'ఈ రోజు తరగతిలో బిడ్డ మంచి ప్రయత్నం చేసింది.',
-        }[locale];
-
-  const prompt = {
-    en: 'Reply H if all is fine, C if you want a callback.',
-    hi: 'सब ठीक है तो H भेजें, बात करनी है तो C भेजें।',
-    te: 'అన్నీ బాగుంటే H, మాట్లాడాలి అంటే C పంపండి.',
-  }[locale];
-
-  return [
-    `VidyaSetu update for ${context.childName}.`,
-    `${context.mentorName} met the child on ${context.sessionDateLabel}.`,
-    context.progressHighlight,
-    concernLine,
-    prompt,
-  ].join(' ');
-}
-
-serve(async (request) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
-
-  if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
+serve(async (req) => {
   try {
-    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const fromNumber = Deno.env.get('TWILIO_FROM_NUMBER');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const { session_ids } = (await req.json()) as { session_ids: string[] };
 
-    if (!accountSid || !authToken || !fromNumber || !supabaseUrl || !serviceRoleKey) {
-      throw new Error('Twilio or Supabase service credentials are missing.');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    const twilioSid = Deno.env.get('TWILIO_ACCOUNT_SID') ?? '';
+    const twilioToken = Deno.env.get('TWILIO_AUTH_TOKEN') ?? '';
+    const twilioFrom = Deno.env.get('TWILIO_FROM_NUMBER') ?? '';
+
+    const results: { session_id: string; status: string }[] = [];
+
+    for (const sessionId of session_ids) {
+      try {
+        const { data: session } = await supabase
+          .from('sessions')
+          .select('id, student_id, subjects_covered')
+          .eq('id', sessionId)
+          .single();
+
+        if (!session) {
+          results.push({ session_id: sessionId, status: 'session_not_found' });
+          continue;
+        }
+
+        const { data: student } = await supabase
+          .from('students')
+          .select('id, name, parent_language')
+          .eq('id', session.student_id)
+          .single();
+
+        if (!student) {
+          results.push({ session_id: sessionId, status: 'student_not_found' });
+          continue;
+        }
+
+        const { data: parentContact } = await supabase
+          .from('parent_contacts')
+          .select('phone, language, sms_consent, last_sms_at')
+          .eq('student_id', student.id)
+          .single();
+
+        if (!parentContact || !parentContact.sms_consent) {
+          results.push({ session_id: sessionId, status: 'no_consent' });
+          continue;
+        }
+
+        if (parentContact.last_sms_at) {
+          const lastSmsTime = new Date(parentContact.last_sms_at).getTime();
+          const hoursSince = (Date.now() - lastSmsTime) / (1000 * 60 * 60);
+          if (hoursSince < RATE_LIMIT_HOURS) {
+            results.push({ session_id: sessionId, status: 'rate_limited' });
+            continue;
+          }
+        }
+
+        const lang = (parentContact.language || student.parent_language || 'hi') as string;
+        const subjectsList = (session.subjects_covered as string[]).join(', ');
+        const templateFn = SMS_TEMPLATES[lang] ?? SMS_TEMPLATES['en'];
+        const messageBody = templateFn(student.name, subjectsList);
+
+        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+        const body = new URLSearchParams({
+          To: parentContact.phone,
+          From: twilioFrom,
+          Body: messageBody,
+        });
+
+        const twilioRes = await fetch(twilioUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${btoa(`${twilioSid}:${twilioToken}`)}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: body.toString(),
+        });
+
+        const twilioData = (await twilioRes.json()) as { sid?: string; message?: string };
+
+        await supabase.from('sms_log').insert({
+          student_id: student.id,
+          session_id: sessionId,
+          phone: parentContact.phone,
+          message_body: messageBody,
+          twilio_sid: twilioData.sid ?? null,
+        });
+
+        await supabase.from('parent_contacts')
+          .update({ last_sms_at: new Date().toISOString() })
+          .eq('student_id', student.id);
+
+        results.push({ session_id: sessionId, status: 'sent' });
+      } catch (err) {
+        results.push({ session_id: sessionId, status: `error: ${String(err)}` });
+      }
     }
 
-    const body = (await request.json()) as SmsRequestBody;
-    const messageBody = buildParentUpdateSms(body.locale, body.context);
-    const client = twilio(accountSid, authToken);
-    const message = await client.messages.create({
-      to: body.to,
-      from: fromNumber,
-      body: messageBody,
+    return new Response(JSON.stringify({ results }), {
+      headers: { 'Content-Type': 'application/json' },
     });
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const { error } = await supabase.from('parent_messages').insert({
-      student_id: body.studentId,
-      direction: 'outbound',
-      channel: 'sms',
-      locale: body.locale,
-      body: messageBody,
-      delivery_status: message.status ?? 'queued',
-      response_code: null,
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
     });
-
-    if (error) {
-      throw error;
-    }
-
-    return new Response(
-      JSON.stringify({
-        sid: message.sid,
-        status: message.status,
-        body: messageBody,
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      },
-    );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unable to send SMS.',
-      }),
-      {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      },
-    );
   }
 });

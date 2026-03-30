@@ -1,54 +1,16 @@
-import type { AppLocale, ParentResponseCode, ParentSmsTemplateContext } from '@/types';
+import type { Language } from '@/types';
 
-const concernPrompt = {
-  en: 'Reply H if all is fine, C if you want a callback.',
-  hi: 'सब ठीक है तो H भेजें, बात करनी है तो C भेजें।',
-  te: 'అన్నీ బాగుంటే H, మాట్లాడాలి అంటే C పంపండి.',
-} satisfies Record<AppLocale, string>;
+export const SMS_TEMPLATES: Record<Language, (studentName: string, subject: string) => string> = {
+  hi: (name, subject) =>
+    `${name} ne aaj ${subject} ki class ki. Khush hain? H bhejo khush ke liye, C bhejo concern ke liye.`,
+  te: (name, subject) =>
+    `${name} ee roju ${subject} class chesindi. Santoshamga unnara? H pampa??i santhosham kosam, C pampa??i concern kosam.`,
+  en: (name, subject) =>
+    `${name} attended ${subject} class today. Happy? Reply H for happy, C for concern.`,
+};
 
-export function buildParentUpdateSms(
-  locale: AppLocale,
-  context: ParentSmsTemplateContext,
-): string {
-  const concernLine =
-    context.concernFlag
-      ? {
-          en: 'Our team noticed a learning risk and will follow up.',
-          hi: 'हमें पढ़ाई में थोड़ी चिंता दिखी है, हमारी टीम संपर्क करेगी।',
-          te: 'అభ్యాసంలో ఒక జాగ్రత్త సూచన కనిపించింది, మా బృందం మిమ్మల్ని సంప్రదిస్తుంది.',
-        }[locale]
-      : {
-          en: 'Today’s session showed steady effort.',
-          hi: 'आज के सत्र में बच्चे ने अच्छा प्रयास किया।',
-          te: 'ఈ రోజు తరగతిలో బిడ్డ మంచి ప్రయత్నం చేసింది.',
-        }[locale];
-
-  const greeting = {
-    en: `VidyaSetu update for ${context.childName}:`,
-    hi: `${context.childName} के लिए विद्यासेतु अपडेट:`,
-    te: `${context.childName} కోసం విద్యాసేతు అప్‌డేట్:`,
-  }[locale];
-
-  const mentorLine = {
-    en: `${context.mentorName} met the child on ${context.sessionDateLabel}.`,
-    hi: `${context.mentorName} ने ${context.sessionDateLabel} को सत्र लिया।`,
-    te: `${context.mentorName} ${context.sessionDateLabel}న సెషన్ నిర్వహించారు.`,
-  }[locale];
-
-  return [greeting, mentorLine, context.progressHighlight, concernLine, concernPrompt[locale]].join(' ');
-}
-
-export function parseParentResponse(body: string): ParentResponseCode {
-  const normalizedBody = body.trim().toUpperCase();
-
-  if (normalizedBody.startsWith('H')) {
-    return 'H';
-  }
-
-  if (normalizedBody.startsWith('C')) {
-    return 'C';
-  }
-
-  return 'N';
-}
-
+export const GUIDANCE_SMS: Record<Language, string> = {
+  hi: 'Kripaya H bhejein agar khush hain, C bhejein agar koi concern hai.',
+  te: 'Dayachesi H pampa??i santosham unte, C pampa??i concern unte.',
+  en: 'Please reply H for happy, C for concern.',
+};

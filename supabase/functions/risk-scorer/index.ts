@@ -1,154 +1,126 @@
-import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-type MigrationStatus = 'stable' | 'seasonal' | 'recently_migrated';
-type ParentResponseCode = 'H' | 'C' | 'N' | null;
-type SkillRatings = {
-  reading: number;
-  comprehension: number;
-  writing: number;
-  arithmetic: number;
-  confidence: number;
-};
+type GapProfile = Record<string, number>;
 
-interface StudentInput {
-  id: string;
-  fullName: string;
-  attendanceRate: number;
-  migrationStatus: MigrationStatus;
+const RISK_WEIGHTS = {
+  gapSeverity: 0.40,
+  sessionRecency: 0.30,
+  parentEngagement: 0.20,
+  improvementTrend: 0.10,
+} as const;
+
+function computeGapSeverity(gapProfile: GapProfile): number {
+  const values = Object.values(gapProfile);
+  return Math.max(...values) / 5.0;
 }
 
-interface SessionInput {
-  sessionDate: string;
-  attendance: 'present' | 'absent' | 'late';
-  skillRatings: SkillRatings;
+function computeRecency(lastSessionAt: string | null): number {
+  if (!lastSessionAt) return 1.0;
+  const daysSince = (Date.now() - new Date(lastSessionAt).getTime()) / (1000 * 60 * 60 * 24);
+  return Math.min(daysSince / 21, 1.0);
 }
 
-interface RiskRequestBody {
-  student: StudentInput;
-  sessions: SessionInput[];
-  latestParentResponse: ParentResponseCode;
+function computeEngagementRisk(engagementScore: number): number {
+  return 1.0 - engagementScore;
 }
 
-type RiskLevel = 'low' | 'moderate' | 'high' | 'critical';
+async function computeImprovementTrend(
+  studentId: string,
+  currentProfile: GapProfile,
+  supabase: SupabaseClient,
+): Promise<number> {
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
 
-function determineRiskLevel(score: number): RiskLevel {
-  if (score >= 80) {
-    return 'critical';
-  }
+  const { data } = await supabase
+    .from('gap_history')
+    .select('gap_profile')
+    .eq('student_id', studentId)
+    .lte('week_start', twoWeeksAgo.toISOString().split('T')[0])
+    .order('week_start', { ascending: false })
+    .limit(1)
+    .single();
 
-  if (score >= 60) {
-    return 'high';
-  }
+  if (!data) return 0.5;
 
-  if (score >= 35) {
-    return 'moderate';
-  }
+  const historical = data.gap_profile as GapProfile;
+  const currentAvg = Object.values(currentProfile).reduce((left, right) => left + right, 0) / Object.keys(currentProfile).length;
+  const historicalAvg = Object.values(historical).reduce((left, right) => left + right, 0) / Object.keys(historical).length;
 
-  return 'low';
+  if (currentAvg < historicalAvg - 0.2) return 0.2;
+  if (currentAvg > historicalAvg + 0.2) return 0.9;
+  return 0.5;
 }
 
-function buildRiskPayload(body: RiskRequestBody) {
-  const sortedSessions = [...body.sessions].sort(
-    (left, right) => new Date(right.sessionDate).getTime() - new Date(left.sessionDate).getTime(),
-  );
-  const latestSession = sortedSessions[0];
-  const lowSkillRatings = sortedSessions.flatMap((session) =>
-    Object.values(session.skillRatings).filter((score) => score <= 2),
-  ).length;
-  const absentSessions = sortedSessions.filter((session) => session.attendance !== 'present').length;
-  const daysSinceLastSession = latestSession
-    ? Math.max(
-        0,
-        Math.round((Date.now() - new Date(latestSession.sessionDate).getTime()) / (1000 * 60 * 60 * 24)),
-      )
-    : 30;
-
-  const reasonCodes: string[] = [];
-  let score = 0;
-
-  if (body.student.attendanceRate < 75) {
-    score += 24;
-    reasonCodes.push('attendance_drop');
-  }
-
-  if (body.student.migrationStatus !== 'stable') {
-    score += body.student.migrationStatus === 'recently_migrated' ? 20 : 12;
-    reasonCodes.push('migration_risk');
-  }
-
-  if (absentSessions >= 2) {
-    score += 18;
-    reasonCodes.push('repeated_absence');
-  }
-
-  if (lowSkillRatings >= 3) {
-    score += 18;
-    reasonCodes.push('learning_gaps');
-  }
-
-  if (daysSinceLastSession > 10) {
-    score += 12;
-    reasonCodes.push('session_gap');
-  }
-
-  if (body.latestParentResponse === 'C') {
-    score += 20;
-    reasonCodes.push('parent_concern');
-  }
-
-  if (sortedSessions.length === 0) {
-    score += 16;
-    reasonCodes.push('no_recent_sessions');
-  }
-
-  const clampedScore = Math.min(100, score);
-
-  return {
-    studentId: body.student.id,
-    score: clampedScore,
-    level: determineRiskLevel(clampedScore),
-    reasonCodes,
-    headline:
-      clampedScore >= 60
-        ? `${body.student.fullName} needs coordinator follow-up.`
-        : `${body.student.fullName} is currently being monitored.`,
-  };
-}
-
-serve(async (request) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
-
-  if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
+serve(async (req) => {
   try {
-    const body = (await request.json()) as RiskRequestBody;
-    const payload = buildRiskPayload(body);
+    const { student_ids } = (await req.json()) as { student_ids: string[] };
 
-    return new Response(JSON.stringify(payload), {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json',
-      },
-      status: 200,
-    });
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unable to score student risk.',
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-        status: 400,
-      },
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
+
+    const updated: string[] = [];
+    const redAlerts: string[] = [];
+
+    for (const studentId of student_ids) {
+      try {
+        const { data: student } = await supabase
+          .from('students')
+          .select('id, gap_profile, last_session_at, engagement_score, risk_color')
+          .eq('id', studentId)
+          .single();
+
+        if (!student) continue;
+
+        const gapProfile = student.gap_profile as GapProfile;
+
+        const gapSeverity = computeGapSeverity(gapProfile);
+        const sessionRecency = computeRecency(student.last_session_at);
+        const parentEngagement = computeEngagementRisk(student.engagement_score);
+        const improvementTrend = await computeImprovementTrend(studentId, gapProfile, supabase);
+
+        const riskScore =
+          gapSeverity * RISK_WEIGHTS.gapSeverity +
+          sessionRecency * RISK_WEIGHTS.sessionRecency +
+          parentEngagement * RISK_WEIGHTS.parentEngagement +
+          improvementTrend * RISK_WEIGHTS.improvementTrend;
+
+        const clampedScore = Math.max(0, Math.min(1, riskScore));
+        const riskColor = clampedScore > 0.7 ? 'red' : clampedScore > 0.4 ? 'amber' : 'green';
+
+        await supabase.from('students').update({
+          risk_score: clampedScore,
+          risk_color: riskColor,
+        }).eq('id', studentId);
+
+        updated.push(studentId);
+
+        if (riskColor === 'red') {
+          redAlerts.push(studentId);
+
+          if (student.risk_color !== 'red') {
+            await supabase.from('coordinator_alerts').insert({
+              student_id: studentId,
+              ngo_id: Deno.env.get('DEFAULT_NGO_ID') ?? '',
+              alert_type: 'risk_red',
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`Risk scorer error for ${studentId}:`, err);
+      }
+    }
+
+    return new Response(JSON.stringify({ updated, redAlerts }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 });
-
