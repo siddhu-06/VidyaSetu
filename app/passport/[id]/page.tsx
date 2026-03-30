@@ -1,238 +1,196 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 
+import { PassportQR } from '@/components/passport/PassportQR';
+import { RadarChart } from '@/components/passport/RadarChart';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
-import { PrintablePassport } from '@/components/passport/PrintablePassport';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { getSessionsByStudent } from '@/lib/db/sessions';
+import { getCachedStudent } from '@/lib/db/students';
+import { formatDate } from '@/lib/utils/date';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
-import { scoreStudentRisk } from '@/lib/intelligence/riskScorer';
-import type {
-  LegacySessionRecord as SessionRecord,
-  PassportSnapshot,
-  StudentRecord,
-} from '@/types';
+import { SUBJECT_LABELS, type GapProfile, type SessionRecord, type SkillRating, type Student, type Subject } from '@/types';
 
-function mapStudentRecord(row: {
+interface StudentRow {
   id: string;
-  full_name: string;
-  preferred_name: string | null;
-  age: number;
-  grade: string;
-  school_name: string | null;
-  locality: string;
-  migration_status: string;
-  baseline_reading_level: number;
-  baseline_arithmetic_level: number;
-  attendance_rate: number;
-  guardian_name: string;
-  guardian_phone: string;
-  preferred_language: string;
-  sms_opt_in: boolean;
+  name: string;
+  grade: 3 | 4 | 5 | 6;
+  gender: 'M' | 'F' | 'other';
+  center_id: string;
+  assigned_mentor_id: string | null;
+  gap_profile: GapProfile;
+  risk_score: number;
+  risk_color: Student['risk_color'];
   last_session_at: string | null;
-  active: boolean;
+  engagement_score: number;
+  preferred_time_slot: string | null;
+  parent_language: Student['parent_language'];
   created_at: string;
-  updated_at: string;
-}): StudentRecord {
-  return {
-    id: row.id,
-    fullName: row.full_name,
-    preferredName: row.preferred_name,
-    age: row.age,
-    grade: row.grade,
-    schoolName: row.school_name,
-    locality: row.locality,
-    migrationStatus: row.migration_status as StudentRecord['migrationStatus'],
-    baselineReadingLevel: row.baseline_reading_level as StudentRecord['baselineReadingLevel'],
-    baselineArithmeticLevel: row.baseline_arithmetic_level as StudentRecord['baselineArithmeticLevel'],
-    attendanceRate: row.attendance_rate,
-    lastSessionAt: row.last_session_at,
-    active: row.active,
-    parentContact: {
-      guardianName: row.guardian_name,
-      phone: row.guardian_phone,
-      preferredLanguage: row.preferred_language as StudentRecord['parentContact']['preferredLanguage'],
-      smsOptIn: row.sms_opt_in,
-    },
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
 }
 
-function mapSessionRecord(row: {
+interface SessionRow {
   id: string;
   offline_id: string;
   student_id: string;
   mentor_id: string;
-  template_id: string | null;
   session_date: string;
-  started_at: string | null;
-  duration_minutes: number;
-  mode: string;
-  attendance: string;
-  engagement_level: number;
-  confidence_delta: number;
-  notes: string;
-  learning_gaps: string[];
-  skill_ratings: Record<string, number>;
+  subjects_covered: Subject[];
+  skill_ratings: Partial<Record<Subject, SkillRating>>;
+  note: string;
+  raw_tags: string[];
+  synced: boolean;
+  synced_at: string | null;
   created_at: string;
-  updated_at: string;
-}): SessionRecord {
+}
+
+interface PublicPassportData {
+  student: Student;
+  sessions: SessionRecord[];
+}
+
+function mapStudentRow(row: StudentRow): Student {
   return {
+    ...row,
+  };
+}
+
+function mapSessionRow(row: SessionRow): SessionRecord {
+  return {
+    ...row,
     id: row.id,
-    offlineId: row.offline_id,
-    studentId: row.student_id,
-    mentorId: row.mentor_id,
-    templateId: row.template_id,
-    sessionDate: row.session_date,
-    startedAt: row.started_at,
-    durationMinutes: row.duration_minutes,
-    mode: row.mode as SessionRecord['mode'],
-    attendance: row.attendance as SessionRecord['attendance'],
-    engagementLevel: row.engagement_level as SessionRecord['engagementLevel'],
-    confidenceDelta: row.confidence_delta as SessionRecord['confidenceDelta'],
-    notes: row.notes,
-    learningGaps: row.learning_gaps,
-    skillRatings: row.skill_ratings as SessionRecord['skillRatings'],
-    syncStatus: 'synced',
-    syncAttempts: 0,
-    syncError: null,
-    lastSyncedAt: row.updated_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    sync_attempts: 0,
+    sync_failed: false,
+  };
+}
+
+function previewNote(note: string): string {
+  const trimmedNote = note.trim();
+
+  if (!trimmedNote) {
+    return 'No note recorded.';
+  }
+
+  return trimmedNote.length > 100 ? `${trimmedNote.slice(0, 100)}...` : trimmedNote;
+}
+
+async function loadLivePublicPassport(studentId: string): Promise<PublicPassportData | null> {
+  const supabase = getSupabaseBrowserClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const studentQuery = supabase.from('students') as unknown as {
+    select(query: string): {
+      eq(column: string, value: string): {
+        maybeSingle(): Promise<{ data: StudentRow | null; error: { message: string } | null }>;
+      };
+    };
+  };
+  const sessionsQuery = supabase.from('sessions') as unknown as {
+    select(query: string): {
+      eq(column: string, value: string): {
+        order(
+          column: string,
+          options?: { ascending?: boolean },
+        ): Promise<{ data: SessionRow[] | null; error: { message: string } | null }>;
+      };
+    };
+  };
+
+  const { data: studentRow, error: studentError } = await studentQuery
+    .select(
+      'id,name,grade,gender,center_id,assigned_mentor_id,gap_profile,risk_score,risk_color,last_session_at,engagement_score,preferred_time_slot,parent_language,created_at',
+    )
+    .eq('id', studentId)
+    .maybeSingle();
+
+  if (studentError) {
+    throw new Error(studentError.message);
+  }
+
+  if (!studentRow) {
+    return null;
+  }
+
+  const { data: sessionRows, error: sessionError } = await sessionsQuery
+    .select('id,offline_id,student_id,mentor_id,session_date,subjects_covered,skill_ratings,note,raw_tags,synced,synced_at,created_at')
+    .eq('student_id', studentId)
+    .order('session_date', { ascending: false });
+
+  if (sessionError) {
+    throw new Error(sessionError.message);
+  }
+
+  return {
+    student: mapStudentRow(studentRow),
+    sessions: (sessionRows ?? []).map(mapSessionRow).slice(0, 3),
+  };
+}
+
+async function loadOfflinePublicPassport(studentId: string): Promise<PublicPassportData | null> {
+  const cachedStudent = await getCachedStudent(studentId);
+
+  if (!cachedStudent) {
+    return null;
+  }
+
+  const { cached_at, ...student } = cachedStudent;
+  void cached_at;
+
+  const queuedSessions = await getSessionsByStudent(studentId);
+
+  return {
+    student,
+    sessions: [...queuedSessions]
+      .sort((left, right) => new Date(right.session_date).getTime() - new Date(left.session_date).getTime())
+      .slice(0, 3),
   };
 }
 
 export default function PublicPassportPage() {
   const params = useParams<{ id: string }>();
+  const [passportData, setPassportData] = useState<PublicPassportData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const passportQuery = useQuery({
-    queryKey: ['public-passport', params.id],
-    queryFn: async (): Promise<PassportSnapshot | null> => {
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPassport(): Promise<void> {
       try {
-        const supabase = getSupabaseBrowserClient();
+        setIsLoading(true);
 
-        if (!supabase) {
-          return null;
+        const liveData = navigator.onLine ? await loadLivePublicPassport(params.id) : null;
+        const fallbackData = liveData ?? (await loadOfflinePublicPassport(params.id));
+
+        if (isMounted) {
+          setPassportData(fallbackData);
         }
-
-        const { data: share, error: shareError } = await supabase
-          .from('passport_shares')
-          .select('*')
-          .or(`public_code.eq.${params.id},student_id.eq.${params.id}`)
-          .maybeSingle();
-
-        if (shareError) {
-          throw shareError;
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
         }
-
-        if (!share) {
-          return null;
-        }
-
-        const [studentResponse, sessionsResponse, riskResponse] = await Promise.all([
-          supabase.from('students').select('*').eq('id', share.student_id).maybeSingle(),
-          supabase.from('sessions').select('*').eq('student_id', share.student_id).order('session_date', {
-            ascending: false,
-          }),
-          supabase
-            .from('risk_snapshots')
-            .select('*')
-            .eq('student_id', share.student_id)
-            .order('calculated_at', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-        ]);
-
-        if (studentResponse.error) {
-          throw studentResponse.error;
-        }
-
-        if (sessionsResponse.error) {
-          throw sessionsResponse.error;
-        }
-
-        if (riskResponse.error) {
-          throw riskResponse.error;
-        }
-
-        if (!studentResponse.data) {
-          return null;
-        }
-
-        const student = mapStudentRecord(studentResponse.data);
-        const sessions = (sessionsResponse.data ?? []).map((session) =>
-          mapSessionRecord({
-            ...session,
-            skill_ratings: session.skill_ratings as Record<string, number>,
-          }),
-        );
-        const averageScore = (key: keyof SessionRecord['skillRatings']) =>
-          sessions.length > 0
-            ? sessions.reduce((sum, session) => sum + session.skillRatings[key], 0) / sessions.length
-            : key === 'arithmetic'
-              ? student.baselineArithmeticLevel
-              : key === 'confidence'
-                ? 3
-                : student.baselineReadingLevel;
-        const risk = riskResponse.data
-          ? {
-              studentId: student.id,
-              score: riskResponse.data.risk_score,
-              level: riskResponse.data.risk_level as PassportSnapshot['risk'] extends infer R
-                ? R extends { level: infer L }
-                  ? L
-                  : never
-                : never,
-              reasonCodes: riskResponse.data.reason_codes,
-              headline: `Latest risk snapshot recorded at ${riskResponse.data.calculated_at}.`,
-            }
-          : scoreStudentRisk({
-              student,
-              sessions,
-              latestParentResponse: null,
-            });
-
-        return {
-          student,
-          risk,
-          radar: [
-            { subject: 'reading', baseline: student.baselineReadingLevel, current: averageScore('reading') },
-            { subject: 'comprehension', baseline: student.baselineReadingLevel, current: averageScore('comprehension') },
-            { subject: 'writing', baseline: student.baselineReadingLevel, current: averageScore('writing') },
-            { subject: 'arithmetic', baseline: student.baselineArithmeticLevel, current: averageScore('arithmetic') },
-            { subject: 'confidence', baseline: 3, current: averageScore('confidence') }
-          ],
-          timeline: sessions.map((session) => ({
-            id: session.id,
-            sessionDate: session.sessionDate,
-            notes: session.notes,
-            attendance: session.attendance,
-            learningGaps: session.learningGaps,
-            scoreDelta: session.confidenceDelta,
-          })),
-          publicCode: share.public_code,
-          qrValue:
-            typeof window !== 'undefined'
-              ? `${window.location.origin}/passport/${share.public_code}`
-              : share.public_code,
-        };
-      } catch (error) {
-        return null;
       }
-    },
-    enabled: Boolean(params.id),
-  });
+    }
 
-  if (passportQuery.isLoading) {
+    void loadPassport();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params.id]);
+
+  if (isLoading) {
     return <SkeletonCard />;
   }
 
-  if (!passportQuery.data) {
+  if (!passportData) {
     return (
       <div className="min-h-screen bg-slate-50 px-4 py-10">
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-5xl">
           <EmptyState
             title="Passport link unavailable"
             description="This QR link may have expired or the student record is not public."
@@ -247,9 +205,49 @@ export default function PublicPassportPage() {
       <div className="mx-auto grid max-w-5xl gap-6">
         <div>
           <p className="text-sm uppercase tracking-[0.24em] text-emerald-700">Public learning passport</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-900">{passportQuery.data.student.fullName}</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-slate-900">{passportData.student.name}</h1>
+          <p className="mt-2 text-sm text-slate-600">Grade {passportData.student.grade}</p>
         </div>
-        <PrintablePassport snapshot={passportQuery.data} />
+
+        <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+          <RadarChart current={passportData.student.gap_profile} />
+          <PassportQR student={passportData.student} />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent sessions</CardTitle>
+            <CardDescription>The last three learning touchpoints available on this passport.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {passportData.sessions.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                No sessions recorded yet
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {passportData.sessions.map((session) => (
+                  <div key={session.id ?? session.offline_id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-900">{formatDate(session.session_date)}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {session.subjects_covered.map((subject) => (
+                          <span
+                            key={`${session.offline_id}-${subject}`}
+                            className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800"
+                          >
+                            {SUBJECT_LABELS[subject]}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm text-slate-700">{previewNote(session.note)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

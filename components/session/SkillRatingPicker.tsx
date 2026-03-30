@@ -1,30 +1,13 @@
 'use client';
 
-import { Badge } from '@/components/ui/Badge';
-import { cn } from '@/lib/utils/cn';
-import type { SkillDomain, SkillRatings, SkillScore } from '@/types';
-
-const labels: Record<SkillDomain, string> = {
-  reading: 'Reading',
-  comprehension: 'Comprehension',
-  writing: 'Writing',
-  arithmetic: 'Arithmetic',
-  confidence: 'Confidence',
-};
-
-const scoreLabels: Record<SkillScore, string> = {
-  1: 'Critical support',
-  2: 'Emerging',
-  3: 'Needs coaching',
-  4: 'Steady',
-  5: 'Strong',
-};
+import { SUBJECTS, SUBJECT_LABELS, SKILL_RATING_LABELS, type SkillRating, type Subject } from '@/types';
 
 interface SkillRatingPickerProps {
-  values: SkillRatings;
-  onChange: (domain: SkillDomain, rating: SkillScore) => void;
+  value: Partial<Record<Subject, SkillRating>>;
+  onChange: (ratings: Partial<Record<Subject, SkillRating>>) => void;
 }
 
+/*
 export function SkillRatingPicker({ values, onChange }: SkillRatingPickerProps) {
   return (
     <div className="grid gap-4">
@@ -70,4 +53,63 @@ export function SkillRatingPicker({ values, onChange }: SkillRatingPickerProps) 
     </div>
   );
 }
+*/
 
+const OPTIONS: SkillRating[] = ['improving', 'steady', 'not_covered'];
+
+function getActiveClass(option: SkillRating, active: boolean): string {
+  if (!active) {
+    return 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300';
+  }
+
+  if (option === 'improving') {
+    return 'bg-lime-400 text-black';
+  }
+
+  if (option === 'steady') {
+    return 'bg-blue-500 text-white';
+  }
+
+  return 'bg-zinc-700 text-zinc-300';
+}
+
+export function SkillRatingPicker({ value, onChange }: SkillRatingPickerProps) {
+  return (
+    <div className="grid gap-4">
+      {SUBJECTS.map((subject) => {
+        const activeRating = value[subject] ?? 'not_covered';
+
+        return (
+          <div key={subject} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{SUBJECT_LABELS[subject]}</p>
+                <p className="text-xs text-slate-500">Choose the best subject status for today’s session.</p>
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {SKILL_RATING_LABELS[activeRating]}
+              </span>
+            </div>
+            <div className="grid gap-2 md:grid-cols-3">
+              {OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={`rounded-full px-4 py-3 text-sm font-semibold transition ${getActiveClass(option, activeRating === option)}`}
+                  onClick={() =>
+                    onChange({
+                      ...value,
+                      [subject]: option,
+                    })
+                  }
+                >
+                  {SKILL_RATING_LABELS[option]}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

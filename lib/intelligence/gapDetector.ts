@@ -1,713 +1,290 @@
-import type { GapDetectionResult, GapKeywordMatch, GradeBand, RiskLevel, SkillDomain } from '@/types';
+// lib/intelligence/gapDetector.ts
+import type {
+  GapDetectionResult,
+  GapKeywordMatch,
+  GapProfile,
+  GradeBand,
+  RiskLevel,
+  SkillDomain,
+  SkillRating,
+  Subject,
+} from '@/types';
 
-interface GapKeywordEntry {
-  keyword: string;
-  domain: SkillDomain;
-  concept: string;
-  stage: GradeBand;
-  severity: RiskLevel;
+export const NCERT_KEYWORD_MAP: Record<Subject, string[]> = {
+  math: [
+    'count', 'counting', 'number', 'numbers', 'digit', 'digits', 'zero',
+    'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen',
+    'eighteen', 'nineteen', 'twenty', 'thirty', 'forty', 'fifty', 'hundred',
+    'place value', 'ones', 'tens', 'hundreds', 'thousands', 'odd', 'even',
+    'addition', 'add', 'adding', 'sum', 'total', 'plus',
+    'subtraction', 'subtract', 'subtracting', 'difference', 'minus', 'take away',
+    'carrying', 'carry', 'regroup', 'regrouping', 'borrow', 'borrowing',
+    'multiplication', 'multiply', 'multiplying', 'times', 'product',
+    'multiplication table', 'tables', 'times table', '2 times', '3 times',
+    'division', 'divide', 'dividing', 'quotient', 'remainder', 'share equally',
+    'fraction', 'fractions', 'half', 'quarter', 'third', 'numerator', 'denominator',
+    'whole', 'part', 'equal parts', 'pizza', 'share',
+    'measurement', 'measure', 'length', 'weight', 'capacity', 'meter', 'centimeter',
+    'kilogram', 'gram', 'litre', 'millilitre', 'ruler', 'scale',
+    'geometry', 'shape', 'shapes', 'circle', 'square', 'rectangle', 'triangle',
+    'pentagon', 'hexagon', 'sides', 'corners', 'angle', 'right angle',
+    'perimeter', 'area', 'symmetry', 'line of symmetry',
+    'decimal', 'decimals', 'decimal point', 'tenths', 'hundredths',
+    'percentage', 'percent', 'ratio', 'proportion', 'rate',
+    'average', 'mean', 'data', 'graph', 'bar graph', 'pie chart', 'tally',
+    'pattern', 'sequence', 'series', 'prime', 'prime number', 'composite',
+    'factor', 'factors', 'multiple', 'multiples', 'lcm', 'hcf',
+    'profit', 'loss', 'simple interest', 'unitary method',
+  ],
+  reading: [
+    'letter', 'letters', 'alphabet', 'vowel', 'vowels', 'consonant', 'consonants',
+    'sound', 'sounds', 'phonics', 'blend', 'blends', 'digraph',
+    'syllable', 'syllables', 'word', 'words', 'spell', 'spelling',
+    'read', 'reading', 'read aloud', 'reading aloud', 'fluency', 'fluent',
+    'sounding out', 'decode', 'decoding', 'sight word', 'sight words',
+    'speed', 'pace', 'accuracy', 'expression', 'punctuation while reading',
+    'vocabulary', 'meaning', 'meanings', 'definition', 'word meaning',
+    'synonym', 'antonym', 'opposite', 'similar', 'context clue',
+    'new word', 'difficult word', 'unknown word',
+    'sentence', 'sentences', 'paragraph', 'paragraphs', 'passage',
+    'story', 'poem', 'article', 'text', 'book', 'chapter',
+    'Hindi', 'Telugu', 'Urdu', 'Marathi', 'regional language',
+    'nothing', 'letter level', 'word level', 'sentence level', 'story level',
+    'beginner', 'basic', 'grade level',
+  ],
+  science: [
+    'plant', 'plants', 'animal', 'animals', 'living', 'non-living',
+    'seed', 'seeds', 'germination', 'germinate', 'root', 'roots', 'stem',
+    'leaf', 'leaves', 'flower', 'fruit', 'photosynthesis', 'sunlight',
+    'food', 'nutrition', 'herbivore', 'carnivore', 'omnivore',
+    'habitat', 'forest', 'desert', 'pond', 'ocean', 'ecosystem',
+    'water', 'water cycle', 'evaporation', 'condensation', 'rain', 'cloud',
+    'air', 'wind', 'oxygen', 'carbon dioxide', 'atmosphere',
+    'soil', 'types of soil', 'erosion', 'weather', 'climate', 'season',
+    'earth', 'sun', 'moon', 'stars', 'planet', 'solar system',
+    'solid', 'liquid', 'gas', 'state', 'change of state', 'melting', 'boiling',
+    'force', 'motion', 'push', 'pull', 'gravity', 'friction', 'speed',
+    'light', 'shadow', 'reflection', 'mirror', 'transparent', 'opaque',
+    'sound', 'vibration', 'echo', 'loud', 'soft', 'pitch',
+    'heat', 'temperature', 'thermometer', 'conductor', 'insulator',
+    'electricity', 'electric circuit', 'bulb', 'battery', 'switch',
+    'magnet', 'magnetic', 'poles', 'attract', 'repel',
+    'body', 'body parts', 'organ', 'organs', 'heart', 'lungs', 'brain',
+    'bones', 'muscles', 'sense', 'senses', 'eye', 'ear', 'nose', 'tongue', 'skin',
+    'health', 'hygiene', 'disease', 'nutrition', 'balanced diet',
+  ],
+  english: [
+    'grammar', 'noun', 'nouns', 'verb', 'verbs', 'adjective', 'adjectives',
+    'adverb', 'adverbs', 'pronoun', 'pronouns', 'preposition', 'prepositions',
+    'conjunction', 'conjunctions', 'article', 'articles', 'the', 'a', 'an',
+    'tense', 'tenses', 'past tense', 'present tense', 'future tense',
+    'simple past', 'past continuous', 'present continuous', 'perfect',
+    'was', 'were', 'is', 'are', 'am', 'will', 'would', 'had', 'have', 'has',
+    'sentence', 'subject', 'predicate', 'object', 'phrase', 'clause',
+    'simple sentence', 'compound sentence', 'question', 'statement', 'exclamation',
+    'punctuation', 'full stop', 'period', 'comma', 'question mark',
+    'exclamation mark', 'apostrophe', 'capital letter', 'uppercase',
+    'write', 'writing', 'essay', 'paragraph writing', 'letter writing',
+    'comprehension', 'read', 'understand', 'answer', 'question',
+    'describe', 'describe in English', 'speak', 'speaking', 'conversation',
+    'english word', 'meaning', 'translation', 'dictionary', 'spelling',
+    'synonym', 'antonym', 'opposite word', 'rhyme', 'rhyming words',
+  ],
+  comprehension: [
+    'main idea', 'main topic', 'central idea', 'key idea', 'theme',
+    'inference', 'infer', 'guess', 'predict', 'prediction', 'what will happen',
+    'summary', 'summarise', 'summarize', 'retell', 'retelling', 'in your own words',
+    'sequence', 'order', 'first', 'then', 'next', 'finally', 'beginning', 'end',
+    'cause', 'effect', 'reason', 'because', 'result', 'so',
+    'compare', 'contrast', 'difference', 'similar', 'same', 'both',
+    'character', 'characters', 'who', 'setting', 'where', 'when', 'plot',
+    'problem', 'solution', 'conflict', 'resolve',
+    'fact', 'opinion', 'evidence', 'support', 'detail',
+    'author', 'purpose', 'why did the author', 'message', 'lesson',
+    'title', 'heading', 'subheading', 'caption', 'diagram', 'illustration',
+    'answer in one sentence', 'answer in two sentences', 'write in brief',
+    'true or false', 'fill in the blank', 'match the column',
+    'passage', 'unseen passage', 'read the passage', 'after reading',
+  ],
+};
+
+export const KEYWORD_TO_STANDARD: Record<string, string> = {
+  carrying: 'Maths-2.3',
+  regroup: 'Maths-2.3',
+  regrouping: 'Maths-2.3',
+  borrow: 'Maths-2.3',
+  borrowing: 'Maths-2.3',
+  'multiplication table': 'Maths-3.1',
+  tables: 'Maths-3.1',
+  fraction: 'Maths-4.2',
+  fractions: 'Maths-4.2',
+  half: 'Maths-4.2',
+  quarter: 'Maths-4.2',
+  'place value': 'Maths-2.1',
+  vowel: 'Hindi-L1.1',
+  consonant: 'Hindi-L1.1',
+  'read aloud': 'Hindi-L1.2',
+  'reading aloud': 'Hindi-L1.2',
+  comprehension: 'Hindi-L2.4',
+  summary: 'Hindi-L2.4',
+  inference: 'Hindi-L2.5',
+  decimal: 'Maths-5.1',
+  percentage: 'Maths-5.2',
+  photosynthesis: 'Sci-4.1',
+  'water cycle': 'Sci-3.2',
+  noun: 'Eng-L2.1',
+  verb: 'Eng-L2.1',
+  adjective: 'Eng-L2.2',
+  'past tense': 'Eng-L3.1',
+  'present tense': 'Eng-L3.1',
+  'main idea': 'Comp-L2.1',
+  cause: 'Comp-L3.1',
+  effect: 'Comp-L3.1',
+};
+
+const RATING_DELTAS: Record<SkillRating, number> = {
+  improving: -0.3,
+  steady: 0.1,
+  not_covered: 0,
+};
+
+const SUBJECT_TO_DOMAIN: Record<Subject, SkillDomain> = {
+  math: 'arithmetic',
+  reading: 'reading',
+  science: 'confidence',
+  english: 'writing',
+  comprehension: 'comprehension',
+};
+
+const SUBJECT_TO_STAGE: Record<Subject, GradeBand> = {
+  math: 'grade_3_5',
+  reading: 'grade_1_2',
+  science: 'grade_3_5',
+  english: 'grade_3_5',
+  comprehension: 'grade_3_5',
+};
+
+const SUBJECT_TO_SEVERITY: Record<Subject, RiskLevel> = {
+  math: 'high',
+  reading: 'moderate',
+  science: 'moderate',
+  english: 'moderate',
+  comprehension: 'moderate',
+};
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
 }
 
-function createEntries(
-  keywords: string[],
-  domain: SkillDomain,
-  concept: string,
-  stage: GradeBand,
-  severity: RiskLevel,
-): GapKeywordEntry[] {
-  return keywords.map((keyword) => ({
-    keyword,
-    domain,
-    concept,
-    stage,
-    severity,
-  }));
-}
-
-export const GAP_KEYWORD_MAP: GapKeywordEntry[] = [
-  ...createEntries(
-    [
-      'alphabet',
-      'letter',
-      'letters',
-      'uppercase',
-      'lowercase',
-      'vowel',
-      'consonant',
-      'akshara',
-      'syllable',
-      'matra',
-      'phoneme',
-      'sound-symbol',
-      'recognition',
-      'naming',
-      'sequence',
-      'order',
-      'tracing',
-      'visual-match',
-      'picture-letter',
-      'letter-confusion',
-    ],
-    'reading',
-    'letter recognition',
-    'foundation',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'rhyme',
-      'rhyming',
-      'alliteration',
-      'blending',
-      'segmenting',
-      'onset',
-      'rime',
-      'clap-syllable',
-      'sound-count',
-      'beginning-sound',
-      'middle-sound',
-      'ending-sound',
-      'phonics-drill',
-      'listen-repeat',
-      'minimal-pair',
-      'syllable-break',
-      'oral-blending',
-      'sound-deletion',
-      'sound-substitution',
-      'hearing-sounds',
-    ],
-    'reading',
-    'phonemic awareness',
-    'foundation',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'cvc',
-      'cvce',
-      'digraph',
-      'trigraph',
-      'cluster',
-      'blend',
-      'decode',
-      'decoding',
-      'word-family',
-      'sight-word',
-      'high-frequency',
-      'silent-letter',
-      'schwa',
-      'long-vowel',
-      'short-vowel',
-      'prefix',
-      'suffix',
-      'root-word',
-      'compound-word',
-      'multisyllabic',
-    ],
-    'reading',
-    'phonics and decoding',
-    'grade_1_2',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'fluency',
-      'pace',
-      'accuracy',
-      'expression',
-      'intonation',
-      'pause',
-      'punctuation-pause',
-      'self-correct',
-      'tracking',
-      'skipping-words',
-      're-reading',
-      'hesitation',
-      'choppy',
-      'word-by-word',
-      'smooth-reading',
-      'echo-reading',
-      'paired-reading',
-      'timed-reading',
-      'oral-reading',
-      'prosody',
-    ],
-    'reading',
-    'fluency',
-    'grade_1_2',
-    'moderate',
-  ),
-  ...createEntries(
-    [
-      'meaning',
-      'vocabulary',
-      'word-meaning',
-      'synonym',
-      'antonym',
-      'context-clue',
-      'topic-word',
-      'phrase',
-      'idiom',
-      'opposite',
-      'category-word',
-      'sorting-words',
-      'word-bank',
-      'new-word',
-      'home-language-transfer',
-      'oral-vocabulary',
-      'labeling',
-      'naming-objects',
-      'describing',
-      'sentence-word',
-    ],
-    'comprehension',
-    'vocabulary development',
-    'grade_1_2',
-    'moderate',
-  ),
-  ...createEntries(
-    [
-      'who',
-      'what',
-      'when',
-      'where',
-      'question-answer',
-      'fact-recall',
-      'sequence-events',
-      'main-character',
-      'setting',
-      'title-clue',
-      'detail-finding',
-      'retell',
-      'retelling',
-      'story-order',
-      'beginning-middle-end',
-      'picture-clue',
-      'matching-detail',
-      'literal',
-      'direct-answer',
-      'finding-facts',
-    ],
-    'comprehension',
-    'literal comprehension',
-    'grade_1_2',
-    'moderate',
-  ),
-  ...createEntries(
-    [
-      'why',
-      'how',
-      'infer',
-      'inference',
-      'prediction',
-      'cause',
-      'effect',
-      'problem-solution',
-      'motive',
-      'feeling',
-      'theme',
-      'lesson',
-      'compare',
-      'contrast',
-      'evidence',
-      'justify',
-      'opinion',
-      'conclusion',
-      'reading-between-lines',
-      'reasoning',
-    ],
-    'comprehension',
-    'inferential comprehension',
-    'grade_3_5',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'summarize',
-      'summary',
-      'gist',
-      'main-idea',
-      'supporting-detail',
-      'paragraph-focus',
-      'topic-sentence',
-      'key-point',
-      'headline',
-      'nonfiction',
-      'fact-opinion',
-      'compare-texts',
-      'author-purpose',
-      'graphic-organizer',
-      'note-taking',
-      'sequencing',
-      'retell-briefly',
-      'identify-theme',
-      'story-map',
-      'summary-sentence',
-    ],
-    'comprehension',
-    'summarisation',
-    'grade_3_5',
-    'moderate',
-  ),
-  ...createEntries(
-    [
-      'handwriting',
-      'grip',
-      'posture',
-      'spacing',
-      'alignment',
-      'line-use',
-      'letter-formation',
-      'stroke',
-      'copying',
-      'dictation',
-      'legibility',
-      'speed-writing',
-      'mirror-writing',
-      'reversal',
-      'capitalization',
-      'punctuation-writing',
-      'copy-from-board',
-      'visual-motor',
-      'fine-motor',
-      'messy-writing',
-    ],
-    'writing',
-    'handwriting mechanics',
-    'foundation',
-    'moderate',
-  ),
-  ...createEntries(
-    [
-      'sentence',
-      'sentence-frame',
-      'subject',
-      'verb',
-      'object',
-      'simple-sentence',
-      'complete-thought',
-      'fragment',
-      'tense',
-      'agreement',
-      'connector',
-      'because',
-      'and',
-      'but',
-      'sequence-word',
-      'question-mark',
-      'full-stop',
-      'capital-letter',
-      'sentence-expansion',
-      'rearrange-words',
-    ],
-    'writing',
-    'sentence construction',
-    'grade_1_2',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'paragraph',
-      'paragraphing',
-      'topic-sentence-writing',
-      'supporting-sentence',
-      'concluding-sentence',
-      'narrative',
-      'description',
-      'dialogue',
-      'letter-writing',
-      'message-writing',
-      'sequence-writing',
-      'planning',
-      'brainstorm',
-      'drafting',
-      'editing',
-      'revision',
-      'coherence',
-      'transition',
-      'details',
-      'organization',
-    ],
-    'writing',
-    'paragraph writing',
-    'grade_3_5',
-    'moderate',
-  ),
-  ...createEntries(
-    [
-      'spelling',
-      'phonetic-spelling',
-      'common-misspelling',
-      'word-family-spelling',
-      'suffix-spelling',
-      'prefix-spelling',
-      'homophone',
-      'plural',
-      'past-tense',
-      'irregular',
-      'article',
-      'preposition',
-      'pronoun',
-      'adjective',
-      'adverb',
-      'noun',
-      'verb-form',
-      'grammar',
-      'editing-mark',
-      'dictation-errors',
-    ],
-    'writing',
-    'grammar and spelling',
-    'grade_3_5',
-    'moderate',
-  ),
-  ...createEntries(
-    [
-      'number-recognition',
-      'number-name',
-      'counting',
-      'rote-count',
-      'one-to-one',
-      'before-after',
-      'more-less',
-      'ascending',
-      'descending',
-      'number-line',
-      'place-value',
-      'tens',
-      'ones',
-      'compare-numbers',
-      'skip-count',
-      'pattern-number',
-      'missing-number',
-      'bundling',
-      'estimation',
-      'ordinal',
-    ],
-    'arithmetic',
-    'number sense',
-    'foundation',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'addition',
-      'add',
-      'plus',
-      'sum',
-      'carry',
-      'regroup',
-      'number-bond',
-      'double',
-      'near-double',
-      'mental-addition',
-      'vertical-addition',
-      'horizontal-addition',
-      'make-ten',
-      'count-on',
-      'fact-family',
-      'addition-fact',
-      'two-digit-addition',
-      'three-digit-addition',
-      'word-problem-addition',
-      'addition-error',
-    ],
-    'arithmetic',
-    'addition',
-    'grade_1_2',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'subtraction',
-      'subtract',
-      'minus',
-      'difference',
-      'borrow',
-      'regroup-subtraction',
-      'count-back',
-      'take-away',
-      'comparison-subtraction',
-      'missing-addend',
-      'subtraction-fact',
-      'fact-fluency',
-      'decompose',
-      'break-apart',
-      'two-digit-subtraction',
-      'three-digit-subtraction',
-      'subtraction-word-problem',
-      'reverse-operation',
-      'checking-work',
-      'subtraction-error',
-    ],
-    'arithmetic',
-    'subtraction',
-    'grade_1_2',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'multiplication',
-      'times',
-      'product',
-      'array',
-      'equal-groups',
-      'repeated-addition',
-      'table',
-      'times-table',
-      'skip-counting',
-      'fact-recall',
-      'doubles',
-      'commutative',
-      'distributive',
-      'multiply-by-10',
-      'carry-multiplication',
-      'two-digit-multiplication',
-      'partial-product',
-      'area-model',
-      'multiplication-word-problem',
-      'multiplication-error',
-    ],
-    'arithmetic',
-    'multiplication',
-    'grade_3_5',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'division',
-      'divide',
-      'quotient',
-      'remainder',
-      'sharing',
-      'grouping',
-      'inverse',
-      'fact-family-division',
-      'division-table',
-      'equal-sharing',
-      'long-division',
-      'partial-quotient',
-      'divide-by-10',
-      'division-word-problem',
-      'estimate-quotient',
-      'check-remainder',
-      'short-division',
-      'division-steps',
-      'division-error',
-      'remainder-interpretation',
-    ],
-    'arithmetic',
-    'division',
-    'grade_3_5',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'fraction',
-      'half',
-      'quarter',
-      'third',
-      'numerator',
-      'denominator',
-      'equal-parts',
-      'fraction-strip',
-      'fraction-circle',
-      'compare-fractions',
-      'equivalent-fraction',
-      'simplify',
-      'improper',
-      'mixed-number',
-      'fraction-number-line',
-      'add-fractions',
-      'subtract-fractions',
-      'fraction-word-problem',
-      'fraction-model',
-      'decimal-link',
-    ],
-    'arithmetic',
-    'fractions',
-    'grade_3_5',
-    'moderate',
-  ),
-  ...createEntries(
-    [
-      'measure',
-      'measurement',
-      'length',
-      'height',
-      'weight',
-      'mass',
-      'capacity',
-      'volume',
-      'litre',
-      'millilitre',
-      'centimetre',
-      'metre',
-      'kilogram',
-      'gram',
-      'clock',
-      'time',
-      'calendar',
-      'money',
-      'rupee',
-      'word-problem-measurement',
-    ],
-    'arithmetic',
-    'measurement and money',
-    'grade_3_5',
-    'moderate',
-  ),
-  ...createEntries(
-    [
-      'shape',
-      '2d-shape',
-      '3d-shape',
-      'circle',
-      'triangle',
-      'square',
-      'rectangle',
-      'polygon',
-      'corner',
-      'side',
-      'edge',
-      'face',
-      'vertex',
-      'symmetry',
-      'pattern-shape',
-      'position',
-      'direction',
-      'map',
-      'angle',
-      'perimeter',
-    ],
-    'arithmetic',
-    'geometry and spatial reasoning',
-    'grade_3_5',
-    'moderate',
-  ),
-  ...createEntries(
-    [
-      'word-problem',
-      'story-sum',
-      'translate',
-      'choose-operation',
-      'multi-step',
-      'key-word',
-      'draw-model',
-      'bar-model',
-      'reasoning-step',
-      'check-answer',
-      'estimate-answer',
-      'units',
-      'information-gap',
-      'relevant-data',
-      'irrelevant-data',
-      'strategy',
-      'math-talk',
-      'explain-solution',
-      'justify-answer',
-      'problem-solving',
-    ],
-    'arithmetic',
-    'word problem solving',
-    'grade_3_5',
-    'high',
-  ),
-  ...createEntries(
-    [
-      'table-reading',
-      'graph',
-      'bar-graph',
-      'pictograph',
-      'tally',
-      'data',
-      'collect-data',
-      'sort-data',
-      'pattern',
-      'repeating-pattern',
-      'growing-pattern',
-      'rule',
-      'input-output',
-      'sequence-pattern',
-      'calendar-pattern',
-      'odd-even',
-      'multiples',
-      'factors',
-      'logic',
-      'classification',
-    ],
-    'arithmetic',
-    'data and patterns',
-    'grade_3_5',
-    'moderate',
-  ),
-];
-
-function normalizeText(value: string): string {
-  return value.toLowerCase().replace(/[^\w\s-]/g, ' ');
-}
-
-export function detectLearningGaps(note: string): GapDetectionResult {
-  const normalizedNote = normalizeText(note);
-  const matches = GAP_KEYWORD_MAP.filter((entry) => normalizedNote.includes(entry.keyword));
-
-  const rankedMatches = matches.reduce<Record<string, GapKeywordMatch>>((accumulator, entry) => {
-    const existingMatch = accumulator[entry.concept];
-
-    if (!existingMatch) {
-      accumulator[entry.concept] = entry;
-      return accumulator;
+function getSubjectForKeyword(keyword: string): Subject | null {
+  for (const subject of Object.keys(NCERT_KEYWORD_MAP) as Subject[]) {
+    if (NCERT_KEYWORD_MAP[subject].includes(keyword)) {
+      return subject;
     }
-
-    const severityOrder: Record<RiskLevel, number> = {
-      low: 1,
-      moderate: 2,
-      high: 3,
-      critical: 4,
-    };
-
-    if (severityOrder[entry.severity] > severityOrder[existingMatch.severity]) {
-      accumulator[entry.concept] = entry;
-    }
-
-    return accumulator;
-  }, {});
-
-  const uniqueMatches = Object.values(rankedMatches);
-  const gaps = uniqueMatches.map((match) => `${match.domain}: ${match.concept}`);
-
-  if (uniqueMatches.length === 0) {
-    return {
-      gaps: [],
-      matches: [],
-      summary: 'No explicit gap keywords detected. Use mentor ratings to confirm learning needs.',
-      confidence: 0.12,
-    };
   }
 
-  const domainCount = uniqueMatches.reduce<Record<SkillDomain, number>>(
-    (accumulator, match) => {
-      accumulator[match.domain] += 1;
-      return accumulator;
-    },
-    {
-      reading: 0,
-      comprehension: 0,
-      writing: 0,
-      arithmetic: 0,
-      confidence: 0,
-    },
-  );
+  return null;
+}
 
-  const dominantDomain = (Object.entries(domainCount).sort((left, right) => right[1] - left[1])[0]?.[0] ??
-    'reading') as SkillDomain;
-  const confidence = Math.min(0.95, 0.2 + uniqueMatches.length * 0.08);
+export function detectGapsFromNote(
+  note: string,
+  skillRatings: Partial<Record<Subject, SkillRating>>,
+): {
+  detectedSubjects: Subject[];
+  matchedKeywords: string[];
+  standardCodes: string[];
+  gapDeltas: Partial<Record<Subject, number>>;
+} {
+  const lowerNote = note.toLowerCase();
+  const detectedSubjects = new Set<Subject>();
+  const matchedKeywords: string[] = [];
+  const standardCodes: string[] = [];
+  const gapDeltas: Partial<Record<Subject, number>> = {};
+  const keywordHitsBySubject: Record<Subject, number> = {
+    math: 0,
+    reading: 0,
+    science: 0,
+    english: 0,
+    comprehension: 0,
+  };
+
+  for (const [subject, keywords] of Object.entries(NCERT_KEYWORD_MAP) as [Subject, string[]][]) {
+    for (const keyword of keywords) {
+      if (lowerNote.includes(keyword)) {
+        detectedSubjects.add(subject);
+        matchedKeywords.push(keyword);
+        keywordHitsBySubject[subject] += 1;
+
+        if (KEYWORD_TO_STANDARD[keyword]) {
+          standardCodes.push(KEYWORD_TO_STANDARD[keyword]);
+        }
+      }
+    }
+  }
+
+  const KEYWORD_BONUS = -0.1;
+
+  for (const [subject, rating] of Object.entries(skillRatings) as [Subject, SkillRating | undefined][]) {
+    if (!rating) {
+      continue;
+    }
+
+    const baseDelta = RATING_DELTAS[rating];
+    const keywordBonus = Math.max(keywordHitsBySubject[subject] * KEYWORD_BONUS, -0.5);
+    gapDeltas[subject] = baseDelta + (detectedSubjects.has(subject) ? keywordBonus : 0);
+  }
 
   return {
-    gaps,
-    matches: uniqueMatches,
-    summary: `Detected ${uniqueMatches.length} likely learning gaps, strongest in ${dominantDomain}.`,
-    confidence,
+    detectedSubjects: Array.from(detectedSubjects),
+    matchedKeywords: uniqueStrings(matchedKeywords),
+    standardCodes: uniqueStrings(standardCodes),
+    gapDeltas,
   };
 }
 
+export function applyGapDeltas(
+  current: GapProfile,
+  deltas: Partial<Record<Subject, number>>,
+): GapProfile {
+  return {
+    math: Math.max(0, Math.min(5, current.math + (deltas.math ?? 0))),
+    reading: Math.max(0, Math.min(5, current.reading + (deltas.reading ?? 0))),
+    science: Math.max(0, Math.min(5, current.science + (deltas.science ?? 0))),
+    english: Math.max(0, Math.min(5, current.english + (deltas.english ?? 0))),
+    comprehension: Math.max(0, Math.min(5, current.comprehension + (deltas.comprehension ?? 0))),
+  };
+}
+
+export function detectLearningGaps(note: string): GapDetectionResult {
+  const detection = detectGapsFromNote(note, {});
+  const matches: GapKeywordMatch[] = detection.matchedKeywords.map((keyword) => {
+    const subject = getSubjectForKeyword(keyword) ?? 'reading';
+
+    return {
+      keyword,
+      domain: SUBJECT_TO_DOMAIN[subject],
+      concept: KEYWORD_TO_STANDARD[keyword] ?? keyword,
+      stage: SUBJECT_TO_STAGE[subject],
+      severity: SUBJECT_TO_SEVERITY[subject],
+    };
+  });
+
+  const uniqueGaps = uniqueStrings(
+    matches.map((match) => `${match.domain}: ${match.concept}`),
+  );
+  const confidence =
+    detection.matchedKeywords.length === 0
+      ? 0.12
+      : Math.min(0.95, 0.18 + detection.matchedKeywords.length * 0.04);
+
+  return {
+    gaps: uniqueGaps,
+    matches,
+    summary:
+      matches.length === 0
+        ? 'No explicit gap keywords detected. Use mentor ratings to confirm learning needs.'
+        : `Detected ${matches.length} likely learning gaps from the session note.`,
+    confidence,
+  };
+}
