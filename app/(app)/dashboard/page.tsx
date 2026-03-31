@@ -21,13 +21,16 @@ export default function DashboardPage() {
       router.replace('/dashboard/ngo');
       return;
     }
-    if (role === 'volunteer') {
-      router.replace('/dashboard/volunteer');
+    if (role === 'mentor') {
+      router.replace('/dashboard/mentor');
       return;
     }
     if (role === 'student') {
       router.replace('/dashboard/student');
+      return;
     }
+
+    router.replace('/auth');
   }, [role, loading, user, router]);
 
   return (

@@ -10,11 +10,108 @@ html {
   scroll-behavior: smooth;
 }
 
-body {
-  font-family: 'Segoe UI', 'Noto Sans', sans-serif;
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+
+  body {
+    font-family: var(--font-sans);
+  }
 }
 
 ::selection {
   background-color: rgba(16, 185, 129, 0.2);
+}
+
+.vs-font-small {
+  font-size: 0.9375rem;
+}
+
+.vs-font-large {
+  font-size: 1.125rem;
+}
+
+.vs-reduced-motion *,
+.vs-reduced-motion *::before,
+.vs-reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+.vs-focus-highlight :focus-visible {
+  outline: 3px solid #ff6b1a !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.28) !important;
+}
+
+.vs-large-tap a,
+.vs-large-tap button,
+.vs-large-tap [role='button'],
+.vs-large-tap input[type='checkbox'] {
+  min-height: 44px;
+}
+
+.vs-large-tap a,
+.vs-large-tap button,
+.vs-large-tap [role='button'] {
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+}
+
+.vs-text-spacing p,
+.vs-text-spacing li,
+.vs-text-spacing label {
+  letter-spacing: 0.02em;
+  word-spacing: 0.08em;
+  line-height: 1.8;
+}
+
+.vs-simplified-reading [data-decorative='true'] {
+  display: none !important;
+}
+
+.vs-simplified-reading [data-reading-content='true'] {
+  max-width: 68ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.vs-simplified-reading section {
+  background-image: none !important;
+}
+
+.vs-high-contrast {
+  color: #111827;
+}
+
+.vs-high-contrast .bg-indigo,
+.vs-high-contrast .bg-gradient-to-br,
+.vs-high-contrast .bg-gradient-to-r {
+  background: #111827 !important;
+}
+
+.vs-high-contrast .bg-cream,
+.vs-high-contrast .bg-teal-light {
+  background: #ffffff !important;
+}
+
+.vs-high-contrast .text-white {
+  color: #ffffff !important;
+}
+
+.vs-high-contrast .text-white\/70,
+.vs-high-contrast .text-white\/80,
+.vs-high-contrast .text-white\/90 {
+  color: #f3f4f6 !important;
+}
+
+.vs-high-contrast a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 

@@ -1,16 +1,27 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
 
 export default function StudentsPage() {
+  const router = useRouter();
+  const { role, loading } = useAuth();
   const { data: students = [], isLoading } = useStudents();
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!loading && role === 'student') {
+      router.replace('/dashboard');
+    }
+  }, [loading, role, router]);
+
+  if (loading || isLoading) {
     return <SkeletonCard />;
   }
 

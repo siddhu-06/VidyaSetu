@@ -1,16 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { MentorMatchList } from '@/components/mentor/MentorMatchList';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { useAuth } from '@/hooks/useAuth';
 import { useMentors } from '@/hooks/useMentors';
 import { useStudents } from '@/hooks/useStudents';
 import { rankMentorsForStudent } from '@/lib/intelligence/mentorMatcher';
 
 export default function MentorsPage() {
+  const router = useRouter();
+  const { role, loading } = useAuth();
   const { data: students = [], isLoading: studentsLoading } = useStudents();
   const { data: mentors = [], isLoading: mentorsLoading } = useMentors();
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -21,7 +25,13 @@ export default function MentorsPage() {
     }
   }, [selectedStudentId, students]);
 
-  if (studentsLoading || mentorsLoading) {
+  useEffect(() => {
+    if (!loading && role !== 'ngo') {
+      router.replace('/dashboard');
+    }
+  }, [loading, role, router]);
+
+  if (loading || studentsLoading || mentorsLoading) {
     return <SkeletonCard />;
   }
 
@@ -34,7 +44,7 @@ export default function MentorsPage() {
         <p className="text-sm uppercase tracking-[0.24em] text-emerald-700">Mentor matching</p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">Five-signal smart match</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Rank mentors by language, locality, grade fit, weekly capacity, and consistency so coordinators can assign faster.
+          Rank mentors by language, locality, grade fit, weekly capacity, and consistency so NGO teams can assign faster.
         </p>
       </div>
       <Card>

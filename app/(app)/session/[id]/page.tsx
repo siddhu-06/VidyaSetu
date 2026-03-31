@@ -7,33 +7,64 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { getQueuedSessionByOfflineId } from '@/lib/db/sessions';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
-import type { Database } from '@/lib/supabase/types';
 import { formatDateTime } from '@/lib/utils/date';
-import type { LegacySessionRecord as SessionRecord } from '@/types';
+import type { QueuedSessionRecord, SkillRating, Subject } from '@/types';
 
-function mapSession(row: Database['public']['Tables']['sessions']['Row']): SessionRecord {
+interface SessionRow {
+  id: string;
+  offline_id: string;
+  student_id: string;
+  mentor_id: string;
+  session_date: string;
+  subjects_covered: Subject[];
+  skill_ratings: Partial<Record<Subject, SkillRating>>;
+  note: string;
+  raw_tags: string[];
+  synced: boolean;
+  synced_at: string | null;
+  created_at: string;
+}
+
+interface SessionDetail {
+  id: string;
+  offlineId: string;
+  sessionDate: string;
+  durationMinutes: number;
+  syncStatus: string;
+  attendance: string;
+  engagementLevel: number;
+  confidenceDelta: number;
+  notes: string;
+  learningGaps: string[];
+}
+
+function mapSession(row: SessionRow): SessionDetail {
   return {
     id: row.id,
     offlineId: row.offline_id,
-    studentId: row.student_id,
-    mentorId: row.mentor_id,
-    templateId: row.template_id,
     sessionDate: row.session_date,
-    startedAt: row.started_at,
-    durationMinutes: row.duration_minutes,
-    mode: row.mode as SessionRecord['mode'],
-    attendance: row.attendance as SessionRecord['attendance'],
-    engagementLevel: row.engagement_level as SessionRecord['engagementLevel'],
-    confidenceDelta: row.confidence_delta as SessionRecord['confidenceDelta'],
+    durationMinutes: Math.max(20, row.subjects_covered.length * 20),
+    syncStatus: row.synced ? 'synced' : 'pending sync',
+    attendance: row.subjects_covered.length > 0 ? 'covered' : 'not recorded',
+    engagementLevel: Math.max(1, Object.keys(row.skill_ratings).length),
+    confidenceDelta: row.raw_tags.length,
+    notes: row.note,
+    learningGaps: row.raw_tags,
+  };
+}
+
+function mapQueuedSession(row: QueuedSessionRecord): SessionDetail {
+  return {
+    id: row.id,
+    offlineId: row.offlineId,
+    sessionDate: row.sessionDate,
+    durationMinutes: row.durationMinutes,
+    syncStatus: row.syncStatus,
+    attendance: row.attendance,
+    engagementLevel: row.engagementLevel,
+    confidenceDelta: row.confidenceDelta,
     notes: row.notes,
-    learningGaps: row.learning_gaps,
-    skillRatings: row.skill_ratings as SessionRecord['skillRatings'],
-    syncStatus: 'synced',
-    syncAttempts: 0,
-    syncError: null,
-    lastSyncedAt: row.updated_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    learningGaps: row.learningGaps,
   };
 }
 
@@ -42,12 +73,12 @@ export default function SessionDetailPage() {
 
   const sessionQuery = useQuery({
     queryKey: ['session-detail', params.id],
-    queryFn: async (): Promise<SessionRecord | null> => {
+    queryFn: async (): Promise<SessionDetail | null> => {
       try {
         const queuedSession = await getQueuedSessionByOfflineId(params.id);
 
         if (queuedSession) {
-          return queuedSession;
+          return mapQueuedSession(queuedSession);
         }
 
         const supabase = getSupabaseBrowserClient();
@@ -58,7 +89,9 @@ export default function SessionDetailPage() {
 
         const { data, error } = await supabase
           .from('sessions')
-          .select('*')
+          .select(
+            'id,offline_id,student_id,mentor_id,session_date,subjects_covered,skill_ratings,note,raw_tags,synced,synced_at,created_at',
+          )
           .or(`id.eq.${params.id},offline_id.eq.${params.id}`)
           .maybeSingle();
 

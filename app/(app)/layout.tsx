@@ -4,6 +4,8 @@ import { AppNav } from '@/components/layout/AppNav';
 import { OfflineBanner } from '@/components/layout/OfflineBanner';
 import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge';
 
+export const dynamic = 'force-dynamic';
+
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_28%),linear-gradient(180deg,_#f8fafc,_#eef2ff)]">

@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 
 import { SessionLoggerForm } from '@/components/session/SessionLoggerForm';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
+import { useAuth } from '@/hooks/useAuth';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { readTestAccessSession } from '@/lib/utils/testAccess';
 
 export default function SessionPage() {
   const router = useRouter();
+  const { role } = useAuth();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function SessionPage() {
         const supabase = getSupabaseBrowserClient();
 
         if (!supabase) {
-          router.replace('/login');
+          router.replace('/auth');
           return;
         }
 
@@ -38,7 +40,14 @@ export default function SessionPage() {
         }
 
         if (!data.session) {
-          router.replace('/login');
+          router.replace('/auth');
+          return;
+        }
+
+        const currentRole = data.session.user.user_metadata?.role;
+
+        if (currentRole !== 'mentor' && role !== 'mentor') {
+          router.replace('/dashboard');
           return;
         }
 
@@ -46,7 +55,7 @@ export default function SessionPage() {
           setIsReady(true);
         }
       } catch {
-        router.replace('/login');
+        router.replace('/auth');
       }
     }
 
@@ -55,7 +64,7 @@ export default function SessionPage() {
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [role, router]);
 
   if (!isReady) {
     return <SkeletonCard />;

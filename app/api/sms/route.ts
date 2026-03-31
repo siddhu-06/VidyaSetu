@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     sentiment === 'happy'
       ? 'Bahut shukriya! Aapki beti ki progress record ho gayi. 🌟'
       : sentiment === 'concern'
-        ? 'Shukriya batane ke liye. Hamara coordinator aapse jald contact karega.'
+        ? 'Shukriya batane ke liye. Hamari NGO support team aapse jald contact karegi.'
         : 'Please H bhejo agar khush hain, ya C bhejo agar concern hai.';
 
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -49,4 +49,3 @@ export async function GET(req: NextRequest) {
     headers: { 'Content-Type': 'text/xml' },
   });
 }
-
